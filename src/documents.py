@@ -149,9 +149,9 @@ def create(req):
     # document at the user's destination or overwrite a concurrently made file.
     with tempfile.TemporaryDirectory(prefix='hwp-create-',dir=CACHE) as folder:
         generated=Path(folder)/target.name
-        hangul_job({'action':'create','format':target.suffix[1:],'output':str(generated),'blocks':blocks,**({'page':req['page']} if 'page' in req else {})})
+        verified=hangul_job({'action':'create','format':target.suffix[1:],'output':str(generated),'blocks':blocks,**({'page':req['page']} if 'page' in req else {})})
         with target.open('xb') as output:output.write(generated.read_bytes())
-    return {'path':str(target),'hash':sha(target)}
+    return {'path':str(target),'hash':sha(target),'modeledContentVerified':verified.get('modeled_content_verified',False)}
 
 def export(req):
     source=check_source(req);target=Path(req['target']).resolve();original=sha(source)
