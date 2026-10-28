@@ -1,6 +1,6 @@
 # 나래 한글 오피스
 
-**나래한글 엔진 기반 · 한컴오피스 2024 연동 · 로컬 문서 작업 공간**
+**나래한글 엔진 기반 · 한컴오피스 한글 연동 · 로컬 문서 작업 공간**
 
 [나래한글 엔진](https://github.com/y5496694/narae_hangul)을 사용하는 Windows용 HWP/HWPX 문서 앱입니다. 기존 한글 문서를 읽고 본문·글자·문단 서식을 AI로 편집하거나, 새 문서·표·그림을 작성하고 PDF 사본을 만들 수 있습니다. 문서와 대화는 내 컴퓨터에 저장합니다. 앱 자체 로그인은 필요 없습니다.
 
@@ -8,11 +8,10 @@
 
 ## 설치
 
-1. Windows 10/11 64비트에 **한컴오피스 2024 한글**을 정식 설치하고 한 번 실행해 초기 설정을 마칩니다. 한컴 프로그램·라이선스·글꼴은 이 저장소에 포함하지 않습니다.
-2. [Node.js 24 LTS](https://nodejs.org/en/download)와 [Python 3.13 64비트](https://www.python.org/downloads/windows/)를 설치합니다. Python 설치 시 **Add Python to PATH**를 선택합니다.
-3. [최신 릴리스](https://github.com/y5496694/Narae_hangul_office/releases/latest)의 `Narae-Hangul-Office-0.8.0-windows-x64.zip`을 내려받아 압축을 풉니다. 또는 이 저장소의 Code → Download ZIP을 사용합니다.
-4. 폴더 안의 **`설치.cmd`**를 실행합니다. 첫 설치에는 인터넷이 필요하며 Electron과 Python 의존성, 공식 Claude 로그인 도구를 내려받습니다. 관리자 권한은 필요 없습니다.
-5. 바탕화면의 **나래 한글 오피스**를 실행합니다.
+1. Windows 10/11 x64에 **한컴오피스 한글이 먼저 설치되어 있어야 합니다.** 한 번 직접 실행해 초기 설정을 마칩니다. 한컴 프로그램·라이선스·글꼴은 이 저장소에 포함하지 않습니다.
+2. [최신 릴리스](https://github.com/y5496694/Narae_hangul_office/releases/latest)의 `Narae-Hangul-Office-0.9.0-windows-x64.zip`을 내려받아 압축을 풉니다. 또는 이 저장소의 Code → Download ZIP을 사용합니다.
+3. 폴더 안의 **`설치.cmd`를 한 번 실행**합니다. Node.js·Python·Electron·엔진 라이브러리·공식 Claude 로그인 도구를 앱 전용 폴더에 자동 설치합니다. **Node.js나 Python을 따로 설치할 필요가 없습니다.** 첫 설치에는 인터넷이 필요하며 관리자 권한은 필요 없습니다.
+4. 바탕화면의 **나래 한글 오피스**를 실행합니다.
 
 기본 설치 위치는 `%LOCALAPPDATA%\Programs\NaraeHangulOffice`, 데이터 위치는 `%LOCALAPPDATA%\NaraeHangulOffice`입니다. 설치 위치에 공백·한글이 있어도 사용할 수 있습니다. 다른 드라이브에 설치하려면:
 
@@ -20,7 +19,19 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallRoot "D:\Apps\NaraeHangulOffice"
 ```
 
-설치가 끝나면 Node.js/Python을 직접 실행할 필요가 없습니다. 설치본의 Electron과 전용 Python 가상환경으로 실행합니다. Python 본체는 제거하지 마세요. 설치 스크립트·전체 소스·고정 의존성 목록을 제공하므로 각 라이브러리를 교체하거나 다시 설치할 수 있습니다.
+Node.js와 Python은 공식 배포 파일의 SHA256을 확인한 뒤 `runtime` 아래에 준비합니다. 시스템 PATH·기존 Python 설치·한글 COM 등록을 변경하지 않습니다. 라이브러리는 `runtime/python/Lib/site-packages`의 교체 가능한 일반 모듈입니다. 설치 스크립트·전체 소스·의존성 목록을 제공합니다.
+
+## 한컴 버전 호환
+
+설치된 Windows용 한글을 자동 탐색하고, 여러 버전이면 최신 버전을 우선합니다. 기존 파일은 원래 열린 한글 창을 재사용합니다.
+
+| 한컴오피스 한글 | 확인 범위 |
+| --- | --- |
+| 2024 | 실제 HWP/HWPX 본문·서식 편집, 저장 후 재열기, PDF 출력 검증 |
+| 2022 | 실제 HWP/HWPX 본문·서식 편집, 저장 후 재열기, PDF 출력 검증 |
+| 2020·2018·기타 Windows 버전 | 설치 경로 자동 탐색 및 COM 연동 대상. 실제 해당 버전의 기능 호환성은 미검증 |
+
+다른 버전의 동작은 한글 COM 자동화·HWPX·PDF 출력 지원 여부와 보안 정책에 따라 달라집니다. 미리보기·PDF 출력에는 해당 한컴의 PDF 출력 기능과 `Hancom PDF` 프린터가 필요합니다. 다른 버전이나 별도 설치 경로를 지정하려면 `NARAE_HWP_EXE`를 실제 `Hwp.exe` 경로로 설정하세요.
 
 ## AI 연결
 
@@ -35,7 +46,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Insta
 
 ## 문서 작업
 
-1. **문서 열기**로 HWP/HWPX를 선택합니다. 미리보기는 한글 2024로 출력한 실제 문서 쪽입니다.
+1. **문서 열기**로 HWP/HWPX를 선택합니다. 미리보기는 설치된 한글로 출력한 실제 문서 쪽입니다.
 2. AI에게 “이 문서의 오탈자를 고쳐 줘”, “제목을 17pt 굵게 바꿔 줘”처럼 요청합니다. 기존 파일은 실제 한글 창을 재사용하며, 편집하려고 별도의 빈 문서를 남기지 않습니다.
 3. **한글에서 열기**로 직접 편집하거나, **현재 내용**으로 현재 열린 문서의 텍스트를 확인할 수 있습니다.
 4. **미리보기**로 저장한 최신 내용을 확인합니다. 자동 저장을 끈 경우에는 한글에서 먼저 저장하세요. **PDF 사본**은 작업 폴더에 새 이름으로 저장합니다.
@@ -43,7 +54,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Insta
 
 기존 문서의 편집 전 사본은 데이터 폴더의 `backups` 또는 `data/backups`에 보관합니다. 파일을 직접 편집할 때는 최신 해시를, 열린 문서를 편집할 때는 최신 내용과 원문 후보 수를 확인합니다. 미저장 문서를 파일 엔진으로 덮어쓰지 않습니다. 변경 추적 문서는 현재 한글의 텍스트와 네이티브 동작으로 처리합니다. 일부 작업이 실패하면 완료 단계와 백업을 알립니다.
 
-지원 범위와 문제 해결은 [사용 안내](docs/사용안내.md)를 참조하세요. 모든 한글 기능을 대체하는 앱은 아니며 한컴오피스 2024 설치가 필요합니다.
+지원 범위와 문제 해결은 [사용 안내](docs/사용안내.md)를 참조하세요. 모든 한글 기능을 대체하는 앱은 아니며 한컴오피스 한글 설치가 필요합니다.
 
 ## 데이터와 개인정보
 
@@ -61,10 +72,10 @@ npm start
 
 `scripts/install-ant.ps1`로 공식 Claude Console 로그인 도구를 설치할 수 있습니다. 기본 설치 프로그램은 이 단계를 자동 수행합니다. ChatGPT OAuth/API 사용에는 이 도구가 필요하지 않습니다.
 
-실행 데이터 위치는 `NARAE_OFFICE_HOME`, Python 경로는 `NARAE_OFFICE_PYTHON`, 사용자 지정 한글 2024 경로는 `NARAE_HWP_EXE` 환경 변수로 지정할 수 있습니다. 검증 로그·문서는 [검증 결과](docs/검증결과.md)에 기록합니다.
+위 명령은 개발자를 위한 수동 실행 방법입니다. 일반 사용자는 `설치.cmd`만 실행하면 됩니다. 실행 데이터 위치는 `NARAE_OFFICE_HOME`, Python 경로는 `NARAE_OFFICE_PYTHON`, 사용자 지정 한글 경로는 `NARAE_HWP_EXE` 환경 변수로 지정할 수 있습니다. 검증 로그·문서는 [검증 결과](docs/검증결과.md)에 기록합니다.
 
 ## 라이선스
 
 앱 코드와 포함된 나래한글 엔진은 **MIT**입니다. 엔진 기준 버전은 `c4ad1460e6b0ead94f7d13814ead8f948470e4fa`이며 원 저작권·허가문을 유지합니다. 외부 라이브러리에는 각각의 라이선스가 적용됩니다. [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 참조하세요.
 
-본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한컴오피스 2024와 연동하는 별도 앱이며 한글과컴퓨터의 공식 제품은 아닙니다.
+본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한컴오피스 한글과 연동하는 별도 앱이며 한글과컴퓨터의 공식 제품은 아닙니다.

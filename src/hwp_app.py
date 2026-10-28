@@ -1,8 +1,4 @@
-"""Create an owned Hancom 2024 automation instance without changing COM registration.
-
-This PC's HWPFrame.HwpObject still points to Office 2022. Launch the chosen
-2024 server explicitly and bind only the ROT object owned by that exact PID.
-"""
+"""Bind only the exact owned Hangul PID; never change COM registration."""
 from pathlib import Path
 import os
 import subprocess
@@ -12,12 +8,8 @@ import win32process
 from win32com.client import dynamic
 
 def create_app(timeout=30):
-    candidates=[Path(os.environ.get('NARAE_HWP_EXE','')),
-                Path(r'C:\Program Files (x86)\Hnc\Office 2024\HOffice130\Bin\Hwp.exe'),
-                Path(r'C:\Program Files\Hnc\Office 2024\HOffice130\Bin\Hwp.exe')]
-    executable=next((file for file in candidates if file.is_file() and file.name.lower()=='hwp.exe'),None)
-    if executable is None:
-        raise ValueError('한글 2024 실행 파일을 찾을 수 없습니다.')
+    from hancom_paths import discover_executable
+    executable=discover_executable()
     child=subprocess.Popen([str(executable),'-Automation'],creationflags=subprocess.CREATE_NO_WINDOW,
                            stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     rot,context=pythoncom.GetRunningObjectTable(),pythoncom.CreateBindCtx(0)
@@ -25,7 +17,7 @@ def create_app(timeout=30):
     try:
         while time.monotonic()<deadline:
             for moniker in rot:
-                if not moniker.GetDisplayName(context,None).startswith('!HwpObject.130.'):
+                if not moniker.GetDisplayName(context,None).startswith('!HwpObject.'):
                     continue
                 try:
                     app=dynamic.Dispatch(rot.GetObject(moniker).QueryInterface(pythoncom.IID_IDispatch))
@@ -45,10 +37,10 @@ def create_app(timeout=30):
                 except (pythoncom.com_error,AttributeError,ValueError):
                     continue
             if child.poll() is not None:
-                raise ValueError('한글 2024 자동화 실행기가 종료되었습니다.')
+                raise ValueError('선택한 한컴 한글 자동화 실행기가 종료되었습니다.')
             pythoncom.PumpWaitingMessages()
             time.sleep(.1)
-        raise ValueError('한글 2024 자동화 준비 시간이 초과되었습니다.')
+        raise ValueError('선택한 한컴 한글 자동화 준비 시간이 초과되었습니다.')
     except Exception:
         if child.poll() is None:
             child.terminate()  # This exact owned process has no opened document.

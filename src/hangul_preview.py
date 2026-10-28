@@ -61,7 +61,10 @@ def export_pages(source, target):
         result=print_open_document(app,target)
         if hashlib.sha256(source.read_bytes()).hexdigest() != original_hash:
             raise ValueError("PDF 변환 중 원본이 변경되었습니다.")
-        return {**result,"source_hash":original_hash,"source_unchanged":True,"native_version":"2024","owned_pid":owned_process.pid,"open_attempts":open_attempts}
+        import win32api
+        executable=str(owned_process.args[0]);version=win32api.GetFileVersionInfo(executable,'\\')
+        numbers=[version['FileVersionMS']>>16,version['FileVersionMS']&65535,version['FileVersionLS']>>16,version['FileVersionLS']&65535]
+        return {**result,"source_hash":original_hash,"source_unchanged":True,"native_version":'.'.join(map(str,numbers)),"native_executable":executable,"owned_pid":owned_process.pid,"open_attempts":open_attempts}
     finally:
         if app is not None:
             close_app(app,owned_process)

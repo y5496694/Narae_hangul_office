@@ -170,7 +170,7 @@ def export(req):
             if not pages:raise ValueError('한글 출력에 쪽이 없습니다.')
         if (sha(target) if target.exists() else None)!=existing:raise ValueError('출력 대상이 다른 프로그램에서 변경되었습니다.')
         result=commit(source,target,generated,original,req.get('overwrite',False))
-    return {**result,'bytes':target.stat().st_size,'pages':pages,'engine':'hancom-2024-hwp'}
+    return {**result,'bytes':target.stat().st_size,'pages':pages,'engine':'hancom-hwp'}
 
 def dispatch(req):
     action=req.get('action')

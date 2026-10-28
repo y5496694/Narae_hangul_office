@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{generateKeyPairSync,sign,createHash}=require('node:crypto');
 const {OAuth,SCOPES}=require('../src/oauth.cjs'),{KeyStore}=require('../src/key-store.cjs'),provider=require('../src/provider.cjs'),settings=require('../src/connection-settings.cjs');
-const os=require('node:os');const python=process.env.NARAE_OFFICE_PYTHON||path.join(__dirname,'../.venv/Scripts/python.exe'),nativeFetch=global.fetch;
+const os=require('node:os');const python=require('../src/runtime-python.cjs').resolvePython(path.resolve(__dirname,'..')),nativeFetch=global.fetch;
 const pair=generateKeyPairSync('rsa',{modulusLength:2048}),jwk={...pair.publicKey.export({format:'jwk'}),kid:'unit-key',alg:'RS256',use:'sig'};
 const jwt=(claims,key=pair.privateKey)=>{const head=Buffer.from(JSON.stringify({alg:'RS256',kid:'unit-key'})).toString('base64url'),body=Buffer.from(JSON.stringify(claims)).toString('base64url');return head+'.'+body+'.'+sign('RSA-SHA256',Buffer.from(head+'.'+body),key).toString('base64url');};
 function fixture({encrypted=false}={}){

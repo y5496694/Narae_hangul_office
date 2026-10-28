@@ -1,4 +1,4 @@
-"""Observe and manage only Hangul HWP/HWPX documents; use owned 2024 servers."""
+"""Observe HWP/HWPX documents and bind only the chosen owned Hangul PID."""
 import hashlib
 import json
 from pathlib import Path
@@ -149,7 +149,7 @@ def run(request):
                 if str(Path(str(candidate.Path)).resolve()).lower()!=target.lower():
                     raise ValueError('원래 한글 창의 문서가 요청한 경로와 다릅니다.')
                 return {"status":"success","opened":True,"reused_empty_pid":reuse_pid}
-        # Bind an owned 2024 server instead of the stale 2022 COM registration.
+        # Bind the chosen owned server instead of a global COM registration.
         # This never replaces a document in the existing user application.
         from hwp_app import open_owned_document,close_app
         app,owned_process,open_attempts = open_owned_document(target)

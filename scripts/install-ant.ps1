@@ -2,6 +2,7 @@
 $ErrorActionPreference='Stop'
 $AppRoot=[IO.Path]::GetFullPath($AppRoot)
 $destination=Join-Path $AppRoot 'tools\ant'
+if((Test-Path -LiteralPath (Join-Path $destination 'ant.exe')) -and (Test-Path -LiteralPath (Join-Path $destination 'LICENSE')) -and (Test-Path -LiteralPath (Join-Path $destination 'LICENSE-MIT'))){if((Get-FileHash -LiteralPath (Join-Path $destination 'ant.exe')).Hash -eq 'C8CD35B64B3FC495875A48ACD9A1F253B72F7CC28BD28B5702420552B43242E4'){Write-Output 'Claude Console OAuth 도구 확인 완료.';return}}
 $temporary=Join-Path $AppRoot ('cache\ant-install-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary,$destination -Force | Out-Null
 try {

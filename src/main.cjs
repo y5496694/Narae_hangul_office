@@ -5,7 +5,7 @@ const connections=require('./connection-settings.cjs'),provider=require('./provi
 const root=path.resolve(__dirname,'..'),home=process.env.NARAE_OFFICE_HOME||path.join(process.env.LOCALAPPDATA||app.getPath('appData'),'NaraeHangulOffice');
 for(const folder of ['data','cache','logs','Documents'])fs.mkdirSync(path.join(home,folder),{recursive:true});
 app.setName('나래 한글 오피스');app.setPath('userData',path.join(home,'data/profile'));app.setPath('sessionData',path.join(home,'cache/session'));app.setPath('logs',path.join(home,'logs'));app.setPath('crashDumps',path.join(home,'logs/crashes'));
-const python=process.env.NARAE_OFFICE_PYTHON||path.join(root,'.venv/Scripts/python.exe');
+const python=require('./runtime-python.cjs').resolvePython(root);
 const load=(file,fallback)=>{try{return JSON.parse(fs.readFileSync(path.join(home,'data',file),'utf8'));}catch{return fallback;}};
 const save=(file,value)=>{const target=path.join(home,'data',file),temp=target+'.'+randomUUID()+'.tmp';fs.writeFileSync(temp,JSON.stringify(value,null,2));fs.renameSync(temp,target);};
 let settings=connections.normalize(load('settings.json',{}),{workspace:path.join(home,'Documents')}),recent=load('recent.json',[]),history=load('conversation.json',[]),window,controller;

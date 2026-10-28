@@ -19,6 +19,6 @@
 | cryptography | Apache-2.0 / BSD-3-Clause and bundled notices. https://github.com/pyca/cryptography |
 | Anthropic ant CLI | Official unchanged binary 2.3.0 downloaded by the installer; its LICENSE and LICENSE-MIT are retained beside it. https://github.com/anthropics/anthropic-cli/releases/tag/v2.3.0 |
 
-The source archive does not bundle Electron, Python wheels or ant executables. The installer fetches their original distributions and retains their licensing files. Installed Python dependencies are ordinary replaceable modules under `.venv/Lib/site-packages`. This application does not statically link Qt or restrict replacement/debugging of its libraries. The entire application source and installation scripts are provided.
+The source archive does not bundle Electron, Python wheels or ant executables. The installer fetches their original distributions and retains their licensing files. Installed Python dependencies are ordinary replaceable modules under `runtime/python/Lib/site-packages`. This application does not statically link Qt or restrict replacement/debugging of its libraries. The entire application source and installation scripts are provided.
 
 본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 공개 문서: https://www.store.hancom.com/support/downloadCenter/hwpOwpml
