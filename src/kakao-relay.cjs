@@ -22,8 +22,10 @@ class KakaoRelay{
  expire(){let changed=false;const now=this.clock();for(const [key,value]of this.callbacks)if(value.expires<=now)this.callbacks.delete(key);
   for(const d of Object.values(this.data.devices))if(['pending','confirmed'].includes(d.state)&&d.expires<=now){d.state='expired';changed=true;}
   for(const j of Object.values(this.data.jobs))if(!terminal.has(j.state)&&((j.state==='queued'&&now-j.created>20000)||(j.state==='running'&&now-j.heartbeat>45000))){j.state='unknown';j.error='PC_CONNECTION_UNCERTAIN';this.callbacks.delete(j.id);changed=true;}
+  for(const [key,cb]of this.callbacks){const job=this.data.jobs[key];if(job&&cb.expires-now<=20000)void this.deliver(job);}
   for(const [key,item]of Object.entries(this.data.dedupe))if(now-item.created>86400000){delete this.data.dedupe[key];changed=true;}
   for(const [key,job]of Object.entries(this.data.jobs))if(terminal.has(job.state)&&now-job.created>7*86400000){delete this.data.jobs[key];this.callbacks.delete(key);changed=true;}
+  for(const d of Object.values(this.data.devices))if(d.conversation&&now-d.conversation.updated>7*86400000){delete d.conversation;changed=true;}
   for(const [key,times]of this.rates)if(times.every(time=>now-time>60000))this.rates.delete(key);
   if(changed)this.save();
  }
@@ -31,7 +33,7 @@ class KakaoRelay{
  user(bot,sender,create=false){const identity=hash(bot+'\0'+sender);let u=Object.values(this.data.users).find(u=>u.identity===identity);if(!u&&create){if(Object.keys(this.data.users).length>=50000)fail(503,'CAPACITY');u={uid:'NR-'+randomBytes(8).toString('hex').toUpperCase(),identity};this.data.users[u.uid]=u;this.save();}return u;}
  device(req){const token=(req.headers.authorization||'').replace(/^Bearer /,'');const d=Object.values(this.data.devices).find(d=>equal(d.tokenHash,hash(token)));if(!token||!d||['revoked','expired'].includes(d.state))fail(401,'DEVICE_AUTH');return d;}
  publicDevice(d){return {id:d.id,uid:d.uid,name:d.name,state:d.state,expires:d.expires,lastSeen:d.lastSeen||0};}
- revoke(d){d.state='revoked';d.tokenHash='';d.codeHash='';for(const j of Object.values(this.data.jobs))if(j.device===d.id&&!terminal.has(j.state)){j.state='unknown';j.error='DEVICE_REVOKED';this.callbacks.delete(j.id);}this.save();}
+ revoke(d){delete d.conversation;d.state='revoked';d.tokenHash='';d.codeHash='';for(const j of Object.values(this.data.jobs))if(j.device===d.id&&!terminal.has(j.state)){j.state='unknown';j.error='DEVICE_REVOKED';this.callbacks.delete(j.id);}this.save();}
  validCallback(url){try{const u=new URL(url);return u.protocol==='https:'&&u.hostname==='bot-api.kakao.com'&&(!u.port||u.port==='443')&&!u.username&&!u.password&&!u.hash&&url.length<2048;}catch{return false;}}
  jobReply(j,page=1){if(!j)return textReply('아직 요청한 작업이 없어.');if(j.state==='completed'){const text=j.output||'작업을 마쳤어.',pages=pagesOf(text);page=Math.min(Math.max(page,1),pages.length);return {version:'2.0',template:{outputs:pages.slice(page-1,page+2).map((text,i)=>({simpleText:{text:text+(pages.length>1?`\n(${page+i}/${pages.length})`:'' )}})),quickReplies:page+2<pages.length?[{label:'다음 내용',action:'message',messageText:`결과 ${j.id} ${page+3}`}]:[]}};}
   if(j.state==='failed')return textReply('AI 생성에 실패했습니다. 오류 코드: '+(j.error==='LOCAL_APPROVAL_DENIED'?'NARAE_APPROVAL_DENIED':'NARAE_REMOTE_AI'));
@@ -39,7 +41,7 @@ class KakaoRelay{
   if(j.state==='unknown')return textReply('PC 연결이 끊겨 작업 완료 여부가 불확실해. 자동으로 다시 실행하지 않았으니 PC에서 확인해 줘.');
   return textReply(j.progress||'연결된 PC에서 처리하고 있어.',[['결과 확인','결과 확인'],['중단','중단']]);
  }
- async deliver(j){const cb=this.callbacks.get(j.id);this.callbacks.delete(j.id);if(!cb||cb.expires<=this.clock())return;j.delivery='callback_attempted';this.save();try{const response=await this.fetch(cb.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.jobReply(j)),redirect:'manual',signal:AbortSignal.timeout(8000)});const result=await response.json().catch(()=>({}));j.delivery=response.ok&&result.status==='SUCCESS'?'callback_accepted':'callback_failed';}catch{j.delivery='callback_unknown';}this.save();}
+ async deliver(j){const cb=this.callbacks.get(j.id);this.callbacks.delete(j.id);if(!cb||cb.expires<=this.clock())return;const pending=!terminal.has(j.state),payload=pending?textReply('작업이 길어지고 있어. 카톡 자동 답변 시간이 끝나기 전에 조회 버튼을 남길게. 아래에서 진행 상태나 완료한 답변을 확인해 줘.',[['결과 확인','결과 '+j.id],['중단','중단']]):this.jobReply(j);j.delivery='callback_attempted';this.save();try{const response=await this.fetch(cb.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(8000)});const result=await response.json().catch(()=>({}));j.delivery=response.ok&&result.status==='SUCCESS'?(pending?'callback_progress_accepted_use_poll':'callback_accepted'):'callback_failed';}catch{j.delivery='callback_unknown';}this.save();}
  skill(body){const r=body?.userRequest,bot=body?.bot?.id,sender=r?.user?.id,text=r?.utterance;
   if(typeof bot!=='string'||typeof sender!=='string'||typeof text!=='string'||!bot||bot.length>256||!sender||sender.length>256||!text.trim()||text.length>4000||(r.user.type&&r.user.type!=='botUserKey'))fail(400,'SKILL_FORMAT');
   if(this.botId&&bot!==this.botId)fail(403,'BOT_NOT_ALLOWED');const t=text.trim();const u=this.user(bot,sender,true);
@@ -51,6 +53,11 @@ class KakaoRelay{
   const d=Object.values(this.data.devices).find(d=>d.uid===u.uid&&d.state==='approved');
   if(t==='연결 해제'){for(const dev of Object.values(this.data.devices))if(dev.uid===u.uid&&!['revoked','expired'].includes(dev.state))this.revoke(dev);return textReply('이 카톡의 PC 원격 연결을 해제했어. UID는 유지돼.');}
   if(t==='연결 상태')return textReply(d?`연결 PC: ${d.name}\n${this.clock()-d.lastSeen<30000?'온라인':'오프라인 · PC와 나래 오피스를 켜 줘.'}`:'아직 승인된 PC가 없어.\n나래 UID: '+u.uid);
+  if(t==='대화 확인'||t==='최근 대화'||/^대화 \d+$/.test(t)){
+   if(!d)return textReply('승인된 PC를 먼저 연결해 줘.');const messages=d.conversation?.messages||[];if(!messages.length)return textReply('공유된 에이전트 대화가 없어. PC의 에이전트(실험) 탭에서 시작해 줘.');
+   const text=messages.map(m=>(m.role==='user'?'나':m.role==='assistant'?'나래':'안내')+' · '+(m.origin==='pc'?'PC':'카톡')+'\n'+m.content).join('\n\n'),pages=pagesOf(text),page=Math.min(Math.max(Number(t.split(' ')[1])||1,1),pages.length);
+   return {version:'2.0',template:{outputs:pages.slice(page-1,page+2).map((text,i)=>({simpleText:{text:text+`\n(${page+i}/${pages.length})`}})),quickReplies:page+2<pages.length?[{label:'대화 이어 보기',action:'message',messageText:'대화 '+(page+3)}]:[]}};
+  }
   const ownJobs=Object.values(this.data.jobs).filter(j=>j.uid===u.uid).sort((a,b)=>b.created-a.created);
   if(t==='결과 확인'||/^결과 [a-f0-9]{32}(?: \d+)?$/.test(t)){const [,jobId,p]=t.split(' ');const j=t==='결과 확인'?ownJobs[0]:ownJobs.find(j=>j.id===jobId);return this.jobReply(j,Math.min(Number(p)||1,1000));}
   if(!d)return textReply('먼저 PC를 연결해 줘.\n나래 UID: '+u.uid);
@@ -80,6 +87,12 @@ class KakaoRelay{
    if(url.pathname==='/v1/device/revoke'){this.revoke(d);return {revoked:true};}
    if(url.pathname==='/v1/device/approve'){if(d.state!=='confirmed')fail(409,'CHAT_CONFIRMATION_REQUIRED');if(Object.values(this.data.devices).some(x=>x.uid===d.uid&&x.state==='approved'&&x.id!==d.id))fail(409,'EXISTING_PC_REQUIRES_UNLINK');d.state='approved';d.lastSeen=this.clock();this.save();return this.publicDevice(d);}
    if(d.state!=='approved')fail(403,'LOCAL_APPROVAL_REQUIRED');d.lastSeen=this.clock();
+   if(url.pathname==='/v1/device/conversation'){
+    if(!Number.isSafeInteger(body.revision)||body.revision<0||!Array.isArray(body.messages)||body.messages.length>20)fail(400,'CONVERSATION_FORMAT');
+    const messages=body.messages.map(m=>{if(!m||!['user','assistant','error'].includes(m.role)||!['pc','kakao'].includes(m.origin)||typeof m.content!=='string'||m.content.length>800||!Number.isSafeInteger(m.created)||m.created<0)fail(400,'CONVERSATION_FORMAT');return {role:m.role,origin:m.origin,content:m.content,created:m.created};});
+    const digest=hash(JSON.stringify(messages)),current=d.conversation;if(current&&body.revision<current.revision)return {accepted:false,revision:current.revision};if(current&&body.revision===current.revision&&current.digest!==digest)fail(409,'CONVERSATION_CONFLICT');
+    d.conversation={revision:body.revision,messages,digest,updated:this.clock()};this.save();return {accepted:true,revision:body.revision};
+   }
    if(url.pathname==='/v1/device/poll'){const running=Object.values(this.data.jobs).some(j=>j.device===d.id&&j.state==='running');const j=running?null:Object.values(this.data.jobs).find(j=>j.device===d.id&&j.state==='queued');if(j){j.state='running';j.heartbeat=this.clock();j.lease=id();}this.save();return {job:j?{id:j.id,prompt:j.prompt,lease:j.lease,uid:j.uid}:null};}
    if(url.pathname==='/v1/device/heartbeat'){const j=this.data.jobs[body.jobId];if(j&&j.device===d.id&&j.state==='running'&&equal(body.lease,j.lease)){j.heartbeat=this.clock();j.progress=String(body.progress||'').slice(0,150);this.save();return {cancelRequested:Boolean(j.cancelRequested)};}this.save();return {cancelRequested:Boolean(body.jobId)};}
    if(url.pathname==='/v1/device/result'){

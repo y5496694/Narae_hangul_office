@@ -30,6 +30,8 @@ jobs:
         env:
           NARAE_QA_ROOT: ${{ runner.temp }}/narae-kakao-qa
         run: npm run test:kakao:desktop
+      - name: Package complete source candidate
+        run: npm run package
       - name: Upload sanitized synthetic verification only
         if: always()
         uses: actions/upload-artifact@v4

@@ -2,7 +2,8 @@
 const fs=require('node:fs'),path=require('node:path');
 function relayOrigin(value,allowLoopback=false){let u;try{u=new URL(value);}catch{throw new Error('중계 서버 HTTPS 주소를 입력하세요.');}const loopback=['127.0.0.1','localhost','[::1]'].includes(u.hostname);if((u.protocol!=='https:'&&!(allowLoopback&&loopback&&u.protocol==='http:'))||u.username||u.password||u.search||u.hash||u.pathname!=='/')throw new Error('중계 서버의 HTTPS 기본 주소만 입력하세요.');return u.origin;}
 class KakaoConnector{
- constructor({store,ledgerFile,execute,notify=()=>{},fetchImpl=fetch,allowLoopback=false,interval=2000}){
+ constructor({store,ledgerFile,execute,notify=()=>{},fetchImpl=fetch,allowLoopback=false,interval=2000,canRun=()=>true,conversation=()=>null}){
+  this.canRun=canRun;this.conversation=conversation;this.synced=new Map();
   this.store=store;this.ledgerFile=ledgerFile;this.execute=execute;this.notify=notify;this.fetch=fetchImpl;this.allowLoopback=allowLoopback;this.interval=interval;this.busy=false;this.polling=false;this.closed=false;this.progress='';this.approval=null;
   const raw=store.get();this.credentials=raw?JSON.parse(raw):null;this.state=this.credentials?.state||'disconnected';this.error='';this.ledger={};
   if(ledgerFile&&fs.existsSync(ledgerFile))this.ledger=JSON.parse(fs.readFileSync(ledgerFile,'utf8'));
@@ -17,10 +18,12 @@ class KakaoConnector{
  async approve(){await this.refresh();if(this.state!=='confirmed')throw new Error('먼저 카톡에 PC 화면의 연결 코드를 보내 주세요.');const d=await this.api('/v1/device/approve',{});this.state=d.state;this.credentials.state=d.state;delete this.credentials.code;this.persist();this.error='';this.changed();return this.status();}
  async unlink(){const c=this.credentials;this.generation=(this.generation||0)+1;this.controller?.abort();this.credentials=null;this.store.remove();this.state='disconnected';let remoteRevoked=true;try{if(c?.token)await this.api('/v1/device/revoke',{},c);}catch{remoteRevoked=false;}this.error=remoteRevoked?'':'PC 연결은 해제했지만 서버 해제는 확인하지 못했어. 카톡에서 연결 해제를 보내 줘.';this.changed();return this.status();}
  async refresh(){const c=this.credentials;if(!c?.token)return this.status();try{const d=await this.api('/v1/device',undefined,c);if(this.credentials!==c||this.closed)return this.status();if(c.state!==d.state){c.state=d.state;this.persist();}this.state=d.state;this.error='';}catch(error){if(this.credentials!==c||this.closed)return this.status();if(error.status===401){this.state='revoked';this.controller?.abort();this.credentials=null;this.store.remove();}else this.error='중계 서버 연결을 확인해 주세요.';}this.changed();return this.status();}
+ async syncConversation(){const c=this.credentials;if(this.closed||this.state!=='approved'||!c)return;const value=this.conversation(c.id);if(!value||this.synced.get(c.id)===value.revision)return;const messages=value.messages.slice(-20).map(m=>({role:m.role,content:m.content.slice(0,800),origin:m.origin,created:m.created}));await this.api('/v1/device/conversation',{revision:value.revision,messages},c);if(this.credentials===c&&!this.closed)this.synced.set(c.id,value.revision);}
  start(){if(this.timer||this.closed)return;this.timer=setInterval(()=>void this.tick(),this.interval);this.timer.unref();void this.tick();}
  async tick(){if(this.closed||this.polling||!this.credentials?.token)return;const c=this.credentials;this.polling=true;try{
   if(this.state!=='approved'){await this.refresh();return;}
   if(this.busy){const result=await this.api('/v1/device/heartbeat',{jobId:this.job.id,lease:this.job.lease,progress:this.progress});if(result.cancelRequested)this.controller?.abort();return;}
+  await this.syncConversation();if(this.credentials!==c||this.closed||!this.canRun())return;
   const {job}=await this.api('/v1/device/poll',{},c);if(this.credentials!==c||this.closed)return;this.error='';if(job){this.busy=true;this.job=job;this.controller=new AbortController();this.changed();void this.run(job,c).catch(()=>{this.error='로컬 작업 기록을 확인해 주세요. 자동 재실행하지 않았습니다.';this.changed();});}
  }catch(error){if(this.credentials!==c||this.closed)return;this.error=error.status===401?'연결이 해제됐어. 다시 연결해 줘.':'중계 서버 연결을 확인해 주세요.';if(this.busy)this.controller?.abort();if(error.status===401){this.state='revoked';this.credentials=null;this.store.remove();}this.changed();}finally{this.polling=false;}}
  async run(job,c){let result;try{

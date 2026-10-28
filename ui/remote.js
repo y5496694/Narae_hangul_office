@@ -9,7 +9,7 @@
   el('remoteCode').hidden=!value.code;el('remoteCode').textContent=value.code?'카톡에 다음 문장을 보내 주세요: 연결 '+value.code+' (5분 이내)':'';
   if(!el('remoteRelay').value&&value.relay)el('remoteRelay').value=value.relay;
   const a=value.approval;el('remoteApproval').hidden=!a;el('remoteApprovalDetails').textContent=a?JSON.stringify({작업:a.name,내용:a.args},null,2):'';
-  el('remoteButton').textContent=a?'카톡 변경 승인 대기':value.busy?'카톡 작업 중':'카카오톡 연동';
+  el('remoteButton').textContent=a?'에이전트 변경 승인 대기':value.busy?'카톡 작업 중':'카카오톡 연동';
   if(a&&!document.querySelector('dialog[open]'))el('remoteDialog').showModal();
  }
  el('remoteButton').onclick=action(async()=>{show(await call('remoteState'));if(!el('remoteDialog').open)el('remoteDialog').showModal();});el('remoteClose').onclick=()=>el('remoteDialog').close();
