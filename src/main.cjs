@@ -41,9 +41,34 @@ const execute=async(name,args,signal)=>{
  throw new Error('지원하지 않는 문서 작업입니다.');
 };
 function emit(event){if(window&&!window.isDestroyed())window.webContents.send('narae:event',event);}
+const {KakaoConnector}=require('./kakao-connector.cjs'),{RemotePolicy}=require('./remote-policy.cjs');
+let remote,remoteSetupError='';
+const remotePolicy=new RemotePolicy({workspace:()=>settings.workspace,notify:approval=>{if(remote){remote.approval=approval;remote.changed();}}});
+async function remoteChat(prompt,{signal,uid,sessionId,progress}){
+ idle();if(!/^[a-f0-9]{32}$/.test(sessionId))throw new Error('REMOTE_SESSION');
+ const config=structuredClone(settings);if(!config.model)throw new Error('REMOTE_AI_NOT_CONFIGURED');
+ controller=new AbortController();const relayAbort=()=>controller?.abort();signal.addEventListener('abort',relayAbort,{once:true});if(signal.aborted)relayAbort();const localSignal=controller.signal;
+ const file='kakao-conversation-'+sessionId+'.json',remoteHistory=load(file,[]);let denied;
+ try{
+  const request=async body=>provider.requestResponse({settings:config,credential:await credential(config),apiKey:config.connectionMode==='api'?keys[config.provider].get():undefined,signal:localSignal,body});
+  const executeRemote=async(name,args,toolSignal)=>{if(denied)throw denied;try{return await remotePolicy.run(name,args,toolSignal,execute);}catch(error){if(error.code==='LOCAL_APPROVAL_DENIED')denied=error;throw error;}};
+  const text=await runAgent({prompt,settings:config,request,execute:executeRemote,signal:localSignal,history:remoteHistory,send:event=>{if(event.type==='tool')progress('PC에서 문서 작업을 확인하고 있어. 변경에는 PC 승인이 필요해.');else if(event.type==='status')progress(remotePolicy.status()?'PC에서 변경 승인을 기다리고 있어.':'PC에서 요청을 처리하고 있어.');}});
+  if(denied)throw denied;if(localSignal.aborted)throw new Error('REMOTE_CANCELLED');remoteHistory.push({role:'user',content:prompt},{role:'assistant',content:text});save(file,remoteHistory.slice(-100));return text;
+ }finally{signal.removeEventListener('abort',relayAbort);controller=null;remotePolicy.close();}
+}
+try{remote=new KakaoConnector({store:new KeyStore(home,python,'kakao-device'),ledgerFile:path.join(home,'data/kakao-jobs.json'),execute:remoteChat,notify:emit,allowLoopback:process.env.NARAE_KAKAO_ALLOW_LOOPBACK==='1'});}catch{remoteSetupError='카카오 기기 저장소를 읽지 못했습니다. 연결 해제 후 다시 연결하세요.';}
+function remoteState(){return remote?remote.status():{state:'disconnected',error:remoteSetupError};}
+function requireRemote(){if(!remote)throw new Error(remoteSetupError||'카카오 연결기를 초기화하지 못했습니다.');return remote;}
 async function preview(args){const file=document(args.path),hash=createHash('sha256').update(fs.readFileSync(file)).digest('hex'),pdf=path.join(home,'cache',hash+'.pdf');return native.savedFileOperation(file,{},async()=>{if(!fs.existsSync(pdf))await runPython(python,home,'documents.py',{action:'previewNativeHangul',path:file,target:pdf});return runPython(python,home,'documents.py',{action:'inspect',path:pdf,page:args.page||0});});}
 const methods={
  state:()=>metadata(),configure,
+ remoteState,
+ remotePair:args=>{idle();return requireRemote().pair(args);},
+ remoteApprove:()=>{idle();return requireRemote().approve();},
+ remoteUnlink:async()=>{if(remote)return remote.unlink();new KeyStore(home,python,'kakao-device').remove();remoteSetupError='저장소를 초기화했습니다. 앱을 다시 실행한 뒤 연결하세요.';return remoteState();},
+ remoteRefresh:()=>requireRemote().refresh(),
+ remoteDecide:args=>remotePolicy.decide(args),
+ remoteCancel:()=>{requireRemote().controller?.abort();return remoteState();},
  chooseFolder:async()=>{idle();const result=await dialog.showOpenDialog(window,{properties:['openDirectory','createDirectory'],defaultPath:settings.workspace});if(!result.canceled)persist({...settings,workspace:fs.realpathSync(result.filePaths[0])});return metadata();},
  chooseFile:async()=>{const result=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'한글 문서',extensions:['hwp','hwpx']}]});if(result.canceled)return null;const file=fs.realpathSync(result.filePaths[0]);grants.add(file.toLowerCase());return selected(file);},
  openRecent:async({path:file})=>{if(!recent.includes(file))throw new Error('최근 문서 목록에 없습니다.');grants.add(fs.realpathSync(file).toLowerCase());return selected(file);},
@@ -68,5 +93,5 @@ const methods={
  }
 };
 ipcMain.handle('narae:call',async(event,name,args)=>{if(!window||event.sender!==window.webContents||event.senderFrame!==window.webContents.mainFrame||!Object.hasOwn(methods,name))throw new Error('허용되지 않은 요청');return methods[name](args||{});});
-app.whenReady().then(()=>{window=new BrowserWindow({width:1420,height:940,minWidth:1000,minHeight:680,title:'나래 한글 오피스',backgroundColor:'#f5f6f8',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});window.setMenuBarVisibility(false);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());window.loadFile(path.join(root,'ui/index.html'));});
-app.on('window-all-closed',()=>app.quit());app.on('before-quit',()=>{controller?.abort();oauth.cancel();native.close();});
+app.whenReady().then(()=>{window=new BrowserWindow({width:1420,height:940,minWidth:1000,minHeight:680,title:'나래 한글 오피스',backgroundColor:'#f5f6f8',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});window.setMenuBarVisibility(false);window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',event=>event.preventDefault());window.loadFile(path.join(root,'ui/index.html'));remote?.start();});
+app.on('window-all-closed',()=>app.quit());app.on('before-quit',()=>{remote?.close();remotePolicy.close();controller?.abort();oauth.cancel();native.close();});
