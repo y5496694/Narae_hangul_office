@@ -1,0 +1,15 @@
+node_modules/
+.venv/
+dist/
+data/
+cache/
+logs/
+__pycache__/
+*.pyc
+*.bin
+*.log
+.env*
+test-results/
+tools/
+installation.json
+*.vbs
