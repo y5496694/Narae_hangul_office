@@ -1,0 +1,3 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto');
+test('every pinned CLI source file exists and matches its committed snapshot',()=>{const root=path.resolve(__dirname,'../vendor/narae-gyomu'),lock=JSON.parse(fs.readFileSync(path.join(root,'OFFICE_VENDOR_LOCK.json'),'utf8'));for(const [relative,expected]of Object.entries(lock.files)){const file=path.resolve(root,relative);assert(file.startsWith(root+path.sep));assert.equal(createHash('sha256').update(fs.readFileSync(file)).digest('hex'),expected,relative);}});
