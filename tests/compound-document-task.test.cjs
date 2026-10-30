@@ -15,3 +15,11 @@ test('after a final attempt a compound workflow cannot recreate its document or 
  const input=[{type:'function_call',call_id:'one',name:'gyomu_wxs_final_prepare',arguments:'{}'},{type:'function_call_output',call_id:'one',output:JSON.stringify({kind:'wxs-final',result:{attempted:true,completed:false}})},{type:'function_call',call_id:'view',name:'gyomu_browser',arguments:'{"action":"snapshot"}'},{type:'function_call_output',call_id:'view',output:'{"title":"모의 문서진행"}'}];
  const step=taskStep(task,input,all);for(const name of ['create_document','export_pdf','gyomu_wxs_prepare','gyomu_wxs_save','gyomu_wxs_final_prepare'])assert(!step.tools.some(t=>t.name===name),name);assert(step.tools.some(t=>t.name==='gyomu_wxs_final_confirm'));
 });
+test('draft planning preserves native WXS identifiers and generated-file results alongside the browser view',()=>{
+ const task=taskFor('에듀파인 기안 작성하고 한글 문서를 첨부해줘. 상신하지 마.'),input=[];
+ const record=(name,args,value)=>{const id=String(input.length);input.push({type:'function_call',call_id:id,name,arguments:JSON.stringify(args)},{type:'function_call_output',call_id:id,output:JSON.stringify(value)});};
+ record('gyomu_browser',{action:'snapshot'},{url:'https://synthetic.invalid/draft',title:'기안 작성',text:'새 기안',elements:[]});
+ record('create_document',{path:'D:/synthetic/plan.hwp'},{path:'D:/synthetic/plan.hwp',modeledContentVerified:true});
+ record('gyomu_wxs',{operation:'windows'},{windows:[{hwnd:'731',title:'새 문서'}]});
+ const step=taskStep(task,input,all),context=step.context;assert.equal(context.nativeObservations.find(o=>o.name==='gyomu_wxs').result.windows[0].hwnd,'731');assert.equal(context.nativeObservations.find(o=>o.name==='create_document').result.path,'D:/synthetic/plan.hwp');
+});
