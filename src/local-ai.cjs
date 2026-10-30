@@ -25,7 +25,8 @@ function messagesFor(body){const catalog=(body.tools||[]).map(t=>({name:t.name,d
 function responseFrom(result,tools){const choice=result.choices?.[0];if(choice?.finish_reason!=='stop')throw new Error('로컬 AI 응답이 중단되거나 길이 한도에 도달했습니다. 요청을 나누세요.');let action;try{action=JSON.parse(choice.message.content);}catch{throw new Error('로컬 AI가 올바른 작업 JSON을 반환하지 않았습니다.');}
  if(action.type==='final'&&typeof action.text==='string'&&action.text.trim())return {output:[{type:'message',role:'assistant',content:[{type:'output_text',text:action.text}]}]};
  if(action.type!=='tool'||!tools.some(t=>t.name===action.name)||!action.args||typeof action.args!=='object'||Array.isArray(action.args))throw new Error('로컬 AI의 도구 선택을 확인할 수 없습니다.');
- const schema=tools.find(t=>t.name===action.name).parameters;if(schema)require('./remote-policy.cjs').validate(action.args,schema);
+ // Execution validates the arguments and feeds failures back to the model.
+ // This parser never executes a tool; unknown names and malformed envelopes still fail.
  return {output:[{type:'function_call',name:action.name,arguments:JSON.stringify(action.args),call_id:randomUUID()}]};
 }
 class LocalAI{
