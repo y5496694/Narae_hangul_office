@@ -15,7 +15,7 @@ function localCreationResult(prompt,settings,calls,name,output){
  // Confirm one explicit file from the engine; small models can otherwise repeat
  // a successful creation. Multi-step requests still go through the agent loop.
  if(settings.provider!=='local'||calls.length!==1||name!=='create_document'||!output?.modeledContentVerified||!output.path)return null;
- if((prompt.match(/\.(?:hwpx|hwp)\b/gi)||[]).length!==1||!/만들|작성|생성/.test(prompt)||/수정|편집|고쳐|읽고|요약|검토|비교|PDF|전송|보내|첨부해|이어서|그다음|그 다음|여러|각각|두 개|2개/i.test(prompt))return null;
+ if((prompt.match(/\.(?:hwpx|hwp)\b/gi)||[]).length!==1||!/만들|작성|생성/.test(prompt)||/수정|편집|고쳐|읽고|요약|검토|비교|PDF|전송|보내|첨부|기안|상신|결재|승인|임시저장|이어서|그다음|그 다음|여러|각각|두 개|2개/i.test(prompt))return null;
  return '문서 파일을 만들었습니다.\n'+output.path+'\n나래한글 엔진에서 저장한 내용을 다시 읽어 대조했습니다.';
 }
 async function runAgent({prompt,context,settings,request,execute,send,signal,history=[],additionalTools=[],agentInstructions=''}){
