@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),{spawn}=require('node:child_process'),{once}=require('node:events'),{randomBytes,randomUUID}=require('node:crypto');
 const {download,verified,sha}=require('./verified-download.cjs'),{ensureRuntime}=require('./local-runtime.cjs');
+const {documentOutput}=require('./planner-document.cjs');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function loopback(value){const u=new URL(value);if(u.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(u.hostname)||u.username||u.password||u.search||u.hash)throw new Error('로컬 AI는 http://127.0.0.1:포트/v1 같은 이 컴퓨터 주소를 사용하세요.');return u.href.replace(/\/$/,'').replace(/\/chat\/completions$/,'');}
 function modelURL(model,file){if(!/^[\w.-]+\/[\w.-]+$/.test(model.repoId||'')||! /^[a-f0-9]{40}$/.test(model.revision||''))throw new Error('이 모델의 허깅페이스 배포가 아직 등록되지 않았습니다. 기존 모델 가져오기를 사용하거나 배포 정보를 갱신하세요.');return `https://huggingface.co/${model.repoId}/resolve/${model.revision}/${file.path}?download=true`;}
@@ -18,7 +19,7 @@ function trimOldestTurn(messages){
  }return false;
 }
 function messagesFor(body){const catalog=(body.tools||[]).map(t=>({name:t.name,description:t.description,parameters:shortSchema(t.parameters)}));const messages=[{role:'system',content:body.instructions.replace(/\\/g,'/')+'\n파일 경로는 슬래시(/)로 구분하세요. 응답은 JSON 하나입니다. 도구 실행은 {"type":"tool","name":"도구명","args":{인자}}; 작업을 마쳤거나 답변할 때는 {"type":"final","text":"한국어 답변"}입니다. 관찰된 도구 결과만 완료 근거로 사용하세요. 생략된 결과는 전체 확인으로 보고하지 마세요.\n사용 가능한 도구와 인자:\n'+JSON.stringify(catalog)}];
- for(const item of body.input||[]){let content;if(item.type==='function_call')content=JSON.stringify({type:'tool',name:item.name,args:JSON.parse(item.arguments||'{}')});else if(item.type==='function_call_output')content='도구 관찰 결과: '+item.output;else if(['user','assistant'].includes(item.role))content=typeof item.content==='string'?item.content:JSON.stringify(item.content);else continue;
+ for(const item of body.input||[]){let content;if(item.type==='function_call')content=JSON.stringify({type:'tool',name:item.name,args:JSON.parse(item.arguments||'{}')});else if(item.type==='function_call_output')content='도구 관찰 결과: '+documentOutput(body.input||[],item);else if(['user','assistant'].includes(item.role))content=typeof item.content==='string'?item.content:JSON.stringify(item.content);else continue;
   messages.push({role:item.role==='assistant'||item.type==='function_call'?'assistant':'user',content});
  }while(messages.reduce((n,m)=>n+m.content.length,0)>24000&&trimOldestTurn(messages)){}return messages;
 }
