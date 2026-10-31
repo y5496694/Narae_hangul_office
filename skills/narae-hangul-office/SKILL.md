@@ -31,6 +31,8 @@ python <skill-dir>/scripts/narae.py run <job.json> --result <result.json>
 
 ## 나래4 오피스 에이전트
 
+사용자가 지정한 필수 학교 업무 10개, 다른 PC의 보안 문서 설정, 6개월 탐색·전송·기안·복무·출장 및 합격 기준은 [기초 벤치](references/basic-benchmark.md)를 읽는다. `bench` 판정에서 미지원·미검증을 합격으로 바꾸지 않는다.
+
 `agent-status`는 설치 모델과 교무 기능 연결을 확인하며 모델을 실행하지 않는다. `agent JOB.json --result RESULT.json`은 앱과 같은 로컬 에이전트·교무 도구를 사용한다. 공통 CLI에서는 `narae-gyomu office agent-status`와 `narae-gyomu office agent JOB.json`을 사용한다. 실제 실행 계약과 예시는 [나래4 CLI](references/narae4.md)를 읽는다. 기본 모델은 나래4이며 클라우드 API로 자동 전환하지 않는다.
 
 지원 영역은 소통메신저 쪽지·대화 조회와 전송 준비, 공문 본문·첨부 열람, 문서진행의 상태·현재 결재자 확인, 기안 입력·임시저장, 나이스 연가·조퇴, 한글 문서 읽기·생성·편집이다. 복무 전체 종류나 공문 발송·접수 전체 자동화를 지원한다는 뜻은 아니다. 업무별 기존 스킬과 실제 도구 관찰을 따른다.

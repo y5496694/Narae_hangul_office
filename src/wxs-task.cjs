@@ -15,13 +15,19 @@ function wxsStep(prompt,input,step,task){
  if(!['edufine','school-final'].includes(task?.area))return step;
  const records=observations(input);
  const native=records.filter(r=>r.name.startsWith('gyomu_wxs')),tools=structuredClone(step.tools),required=(name,values,instructions)=>{const tool=tools.find(t=>t.name===name);if(!tool)return step;tool.parameters={type:'object',properties:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,{type:'string',enum:[String(value)]}])),required:Object.keys(values),additionalProperties:false};return {tools:[tool],required:true,context:{source:'직전 실제 WXS 도구 결과',observations:native.slice(-2).map(r=>{const text=JSON.stringify(r);return text.length<=4000?r:{name:r.name,args:r.args,truncated:true,preview:text.slice(0,4000)};})},instructions};};
- const prepared=native.findLast(r=>r.name==='gyomu_wxs_final_prepare'&&r.value?.ok&&r.value.receiptId),confirmed=native.find(r=>r.name==='gyomu_wxs_final_confirm');
+ const prepared=native.findLast(r=>r.name==='gyomu_wxs_final_prepare'&&r.value?.ok&&r.value.receiptId),confirmed=native.find(r=>r.name==='gyomu_wxs_final_confirm'||r.name==='gyomu_wxs_final_continue'&&r.args.operation==='confirm-previewed');
  if(prepared&&!confirmed){
   const dialog=native.findLast(r=>r.name==='gyomu_wxs_final_dialog'&&r.args.receipt_id===prepared.value.receiptId);
   if(!dialog)return required('gyomu_wxs_final_dialog',{receipt_id:prepared.value.receiptId},'직전 실행의 실제 receiptId로 확인창을 읽는다. 상신을 다시 실행하지 않는다.');
   const message=dialog.value?.message;
+  if(dialog.value?.document_preview?.fingerprint&&typeof message==='string'&&tools.some(t=>t.name==='gyomu_wxs_final_continue'))return required('gyomu_wxs_final_continue',{operation:'confirm-previewed',receipt_id:prepared.value.receiptId,expected_message:message,expected_fingerprint:dialog.value.document_preview.fingerprint},'원본 CLI가 반환한 내부결재 준비 후 본문·결재선·첨부·공개 구분 미리보기를 현재 기록의 지문으로 대조한다. 원본 CLI의 변경 검증을 통과한 동일 기록만 이어 처리한다.');
   if((dialog.value?.present===true||dialog.value?.status==='confirmation')&&typeof message==='string'&&/상신|결재|승인/.test(message)&&/겠습니까|할까요/.test(message)&&!dialog.value.document_preview&&!dialog.value.route_review&&!/삭제|발송|전송|반려|인증|암호|서명/.test(message))return required('gyomu_wxs_final_confirm',{receipt_id:prepared.value.receiptId,expected_message:message},'실제로 관찰한 같은 실행의 확인 문구를 정확히 사용한다. 목록 재조회 전에는 완료로 보고하지 않는다.');
   return {...step,tools:tools.filter(t=>['gyomu_browser','gyomu_wxs'].includes(t.name)),instructions:'이 확인창은 자동 수락 가능한 일반 상신·결재 확인으로 검증되지 않았다. 문구와 현재 상태를 보고하고 재상신·별도 수락을 하지 않는다.'};
+ }
+ if(confirmed&&prepared&&tools.some(t=>t.name==='gyomu_wxs_final_continue')){
+  const preview=native.find(r=>r.name==='gyomu_wxs_final_continue'&&r.args.operation==='process-preview'),applied=native.find(r=>r.name==='gyomu_wxs_final_continue'&&r.args.operation==='process-apply');
+  if(!confirmed.value.error&&!preview)return required('gyomu_wxs_final_continue',{operation:'process-preview',receipt_id:prepared.value.receiptId},'상신 확인 후 원본 CLI로 동일 기록의 실제 문서처리 양식과 선택값을 확인한다.');
+  if(preview?.value.fingerprint&&!applied)return required('gyomu_wxs_final_continue',{operation:'process-apply',receipt_id:prepared.value.receiptId,expected_fingerprint:preview.value.fingerprint},'직전 실제 문서처리 양식의 지문으로 동일 작업을 한 번 이어 처리한다. 암호·공문게시·변경된 문서는 원본 CLI에서 거절된다. 이후 목록을 재조회한다.');
  }
  if(confirmed&&!records.some(r=>r.name==='gyomu_browser'&&records.indexOf(r)>records.indexOf(confirmed)&&!r.value?.error))return required('gyomu_browser',{action:'snapshot'},'최종 확인 뒤 현재 문서진행 목록의 제목·상태·결재자를 실제 재조회한다.');
  const saveAttempt=native.findLast(r=>r.name==='gyomu_wxs_save'||r.name==='gyomu_wxs_prepare'&&r.value?.ok&&(r.value.result?.saved===true||r.value.result?.save?.saved===true));

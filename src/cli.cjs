@@ -84,9 +84,11 @@ const usage='narae-office doctor | schema | install-skill | agent-status | agent
 async function main(argv=process.argv.slice(2)){
  let output,response;
  try{
-  if(!argv.length||['help','--help','-h'].includes(argv[0])){process.stdout.write(usage+'\n');return 0;}
+  if(!argv.length||['help','--help','-h'].includes(argv[0])){process.stdout.write(usage+'\nbench [run.json] [--result grade.json] · school-status · school-config config.json\n');return 0;}
   const args=[...argv],action=args.shift(),take=name=>{const i=args.indexOf(name);if(i<0)return undefined;if(!args[i+1])throw new Error(name+' 값이 필요합니다.');return args.splice(i,2)[1];};
   const result=take('--result'),fullIndex=args.indexOf('--full'),full=fullIndex>=0;
+  if(['school-config','school-status'].includes(action)){const login=require('./portal-login.cjs'),home=require('./agent-cli.cjs').defaultHome(),file=args.shift();if(args.length||action==='school-status'&&file)throw new Error('school-config 설정.json 또는 school-status 형식을 사용하세요.');response=action==='school-status'?await login.loadProfile('Status',login.config(home)):login.configure(home,JSON.parse(fs.readFileSync(absolute(file,process.cwd()),'utf8').replace(/^\uFEFF/,'')));response={success:true,...response};output=resultPath(result,{input:file},process.cwd());writeResult(output,response);process.stdout.write(JSON.stringify(response,null,2)+'\n');return 0;}
+  if(action==='bench'){const file=args.shift();if(args.length)throw new Error('bench [실행결과.json] [--result 결과.json] 형식을 사용하세요.');const benchmark=require('./office-benchmark.cjs');response=file?benchmark.readRun(file):benchmark.contract;response={success:file?response.passed:true,...response};output=resultPath(result,{input:file},process.cwd());writeResult(output,response);process.stdout.write(JSON.stringify(response,null,2)+'\n');return response.success?0:1;}
   if(full)args.splice(fullIndex,1);
   const offset=take('--offset'),limit=take('--limit');let job,base=process.cwd(),jobFile;
   if(action==='run'||action==='agent'){

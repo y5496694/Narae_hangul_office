@@ -19,7 +19,7 @@ function config(job,base=process.cwd()){
  return {settings:{workspace,provider:'local',connectionMode:'local',localSource:'managed',model:job.model||'narae4',browserMode:'isolated',keepSchoolSession:false,hwpAutoSave:job.save!==false},context};
 }
 async function status({home=defaultHome(),createAI=options=>new LocalAI(options)}={}){
- const ai=createAI({root,home});try{return {version:require('../package.json').version,defaultModel:'narae4',localAI:ai.status(),capabilities:['cbe','edufine-documents','edufine-progress','wxs-draft','neis-duty','hangul'],schoolExecution:'현재 로그인 및 실제 관찰 결과에 따라 실행합니다. 인증은 PC에서 직접 처리합니다.'};}finally{await ai.close();}
+ const ai=createAI({root,home});try{return {version:require('../package.json').version,defaultModel:'narae4',localAI:ai.status(),capabilities:['cbe','cbe-date-range-archive','configured-portal-login','edufine-documents','edufine-progress','wxs-draft','wxs-final-processing','neis-duty','neis-duty-query','neis-trip-input','hangul'],benchmark:{contract:require('./office-benchmark.cjs').contract.id,requiredTasks:10,releaseVerified:false,command:'narae-office bench [run.json]'},schoolExecution:'현재 로그인·권한·실제 관찰 결과에 따라 실행합니다. 출장 입력 보조와 실제 상신 완료는 별개이며 10개 과제 전체 실환경 합격은 아직 미검증입니다.'};}finally{await ai.close();}
 }
 async function run(job,{base=process.cwd(),home=defaultHome(),signal=new AbortController().signal,onEvent=()=>{},createAI=options=>new LocalAI(options),createIntegrations=options=>new OfficeIntegrations(options),executeDocument}={}){
  const {settings,context}=config(job,base);for(const d of ['cache','logs','data'])fs.mkdirSync(path.join(home,d),{recursive:true});

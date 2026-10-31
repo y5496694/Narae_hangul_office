@@ -1,11 +1,12 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{randomBytes,createHash}=require('node:crypto');
+const {isDeepStrictEqual}=require('node:util');
 const {inside,tools}=require('./agent.cjs');
 const READ=new Set(['list_files','read_document','read_live_document','read_image']);
 function validate(value,schema,depth=0,location='args'){
  if(depth>20)throw new Error('원격 도구 인자가 너무 깊습니다.');
  if(schema.anyOf){if(!schema.anyOf.some(option=>{try{validate(value,option,depth+1,location);return true;}catch{return false;}}))throw new Error('지원하지 않는 변경 인자입니다.');return;}
- if(schema.enum&&!schema.enum.includes(value))throw new Error(location+': 지원하지 않는 원격 인자 값입니다.');
+ if(schema.enum&&!schema.enum.some(option=>isDeepStrictEqual(option,value)))throw new Error(location+': 지원하지 않는 원격 인자 값입니다.');
  if(schema.type==='object'){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('객체 인자가 필요합니다.');
   for(const required of schema.required||[])if(!Object.hasOwn(value,required))throw new Error('필수 인자가 없습니다: '+required);
@@ -15,7 +16,7 @@ function validate(value,schema,depth=0,location='args'){
   for(const [index,item]of value.entries())validate(item,schema.items||{},depth+1,location+'['+index+']');
  }else if(schema.type==='integer'){if(!Number.isSafeInteger(value))throw new Error('정수 인자가 필요합니다.');}
  else if(schema.type&&typeof value!==schema.type)throw new Error(location+': 원격 인자의 형식을 확인하세요 ('+schema.type+').');
- if(typeof value==='number'&&(!Number.isFinite(value)||(schema.minimum!==undefined&&value<schema.minimum)))throw new Error('숫자 인자의 범위를 확인하세요.');
+ if(typeof value==='number'&&(!Number.isFinite(value)||(schema.minimum!==undefined&&value<schema.minimum)||(schema.maximum!==undefined&&value>schema.maximum)))throw new Error('숫자 인자의 범위를 확인하세요.');
 }
 class RemotePolicy{
  constructor({workspace,notify=()=>{},timeout=120000,autoAllow=()=>false}){this.workspace=workspace;this.notify=notify;this.timeout=timeout;this.autoAllow=autoAllow;this.pending=null;}
