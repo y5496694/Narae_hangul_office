@@ -32,11 +32,7 @@ async function run(job,{base=process.cwd(),home=defaultHome(),signal=new AbortCo
    if(name.startsWith('gyomu_'))return await integrations.execute(name,args,toolSignal);
    return await policy.run(name,args,toolSignal,async(name,a)=>{
     if(executeDocument)return executeDocument(name,a,toolSignal);
-    if(name==='read_image')return {kind:'image',path:a.path,image:require('./agent-media.cjs').readImage(a.path)};
-    if(name==='list_files')return fs.readdirSync(settings.workspace).filter(f=>/\.(?:hwpx?|png|jpe?g|gif|webp)$/i.test(f)).map(f=>path.join(settings.workspace,f));
-    const actions={read_document:'inspect',read_live_document:'live-read',edit_live_document:'live-edit',edit_document:'edit',create_document:'create',export_pdf:'export'};
-    if(!actions[name])throw Error('지원하지 않는 문서 도구입니다.');
-    return require('./cli.cjs').execute({...a,action:actions[name],...(name==='read_document'?{full:false}:{}),content:a.text,save:settings.hwpAutoSave},{base:settings.workspace,home,python});
+    return require('./document-tools.cjs').executeDocumentTool(name,{...a,save:settings.hwpAutoSave},{workspace:settings.workspace,home,python,signal:toolSignal});
    });
   }catch(e){if(e.code==='LOCAL_APPROVAL_DENIED')denied=e;throw e;}
  };

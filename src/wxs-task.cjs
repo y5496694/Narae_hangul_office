@@ -29,6 +29,11 @@ function wxsStep(prompt,input,step,task){
   const reread=native.findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='draft-status'&&String(r.args.hwnd)===String(saveAttempt.args.hwnd)&&native.indexOf(r)>native.indexOf(saveAttempt));
   if(!reread)return required('gyomu_wxs',{operation:'draft-status',hwnd:saveAttempt.args.hwnd},'임시저장을 이미 한 번 시도했다. 같은 창의 실제 상태를 다시 읽고 재저장하지 않는다.');
   if(saveAttempt.value.error||!saveAttempt.value.ok||!(saveAttempt.value.result?.saved===true||saveAttempt.value.result?.save?.saved===true)||reread.value.error)return {tools:[],receipt:'기안 임시저장을 시도했지만 완료를 확인하지 못했습니다. '+(saveAttempt.value.error||reread.value.error||'저장 결과 미확인')+'\n같은 창의 상태를 재조회했으며 같은 저장을 반복하거나 상신하지 않았습니다.'};
+  if(task.area==='edufine'&&task.writing&&!task.summary&&!task.documentCreate){
+   const before=native.slice(0,native.indexOf(saveAttempt)).findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='draft-status'&&String(r.args.hwnd)===String(saveAttempt.args.hwnd)&&!r.value.error);
+   const changed=before&&saveAttempt.name==='gyomu_wxs_save'&&['title','body','attachments','approval_route'].some(k=>Object.hasOwn(before.value,k)&&JSON.stringify(before.value[k])!==JSON.stringify(reread.value[k]));
+   return {tools:[],receipt:changed?'임시저장 응답 후 같은 창을 다시 읽었지만 원문·첨부·결재선 중 변경된 항목이 있어 보존 완료로 처리하지 않았습니다.\n재저장하거나 상신하지 않았습니다.':'기안 임시저장 응답과 같은 창의 제목·본문·첨부·결재선을 재조회했습니다.\n제목: '+(reread.value.title||'제목 미확인')+'\n미상신입니다. 저장·입력을 반복하지 않았습니다. 임시저장 목록 재열기와 첨부 서버 바이트 검증은 별도 확인 대상입니다.'};
+  }
   return {...step,tools:tools.filter(t=>!['gyomu_wxs_save','gyomu_wxs_prepare','gyomu_wxs_options'].includes(t.name)),instructions:(step.instructions||'')+' 임시저장 시도 뒤 같은 초안을 다시 읽었다. 같은 저장이나 본문 입력을 반복하지 않고 실제 결과·목록 확인 범위만 보고한다.'};
  }
  const direct=/현재\s*열린\s*WXS|이미\s*열린\s*WXS/i.test(prompt),listing=native.findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='windows'&&!r.value?.error),windows=listing?.value?.windows||[];
@@ -38,10 +43,24 @@ function wxsStep(prompt,input,step,task){
  const paths=[...prompt.matchAll(/["“]([^"“”\r\n]+\.hwpx?)["”]/gi)].map(m=>m[1]).filter(p=>path.isAbsolute(p)&&fs.existsSync(p));
  if(paths.length===1&&!prepared&&!applied&&!records.some(r=>r.name==='read_document'&&!r.value?.error&&path.resolve(r.args.path).toLowerCase()===path.resolve(paths[0]).toLowerCase()&&(r.value?.hash||r.value?.input_sha256)))return required('read_document',{path:paths[0]},'첨부할 실제 한글 계획서를 먼저 읽고 날짜·장소·인원·예산을 확인한다. 본문에 없는 사실을 만들지 않는다.');
  if(applied&&(!status||native.indexOf(status)<native.indexOf(applied)))return required('gyomu_wxs',{operation:'draft-status',hwnd:applied.args.hwnd},'입력 후 동일 기안을 다시 읽어 본문·첨부 서버 사본·결재선을 대조한다. 파일명만으로 첨부 검증을 완료하지 않는다.');
+ if(applied&&status&&!saveAttempt&&/임시\s*저장/.test(prompt)){
+  const config=applied.args.config||{},normalize=s=>String(s||'').replace(/\s+/g,' ').trim();
+  if(config.title&&normalize(config.title)!==normalize(status.value.title)||config.body&&!normalize(status.value.document_text||status.value.body).includes(normalize(config.body)))return {tools:[],receipt:'기안 입력 후 다시 읽은 제목·본문이 요청한 값과 일치하지 않아 임시저장을 실행하지 않았습니다. 미상신입니다.'};
+  if(status.value.title)return required('gyomu_wxs_save',{hwnd:applied.args.hwnd,expected_title:status.value.title,name:config.save_name||status.value.title},'기안 입력과 재조회를 확인했다. 사용자가 요청한 임시저장을 같은 제목으로 한 번 실행한다. 상신하지 않는다.');
+ }
  const basic=/첨부/.test(prompt)&&/한글|\.hwpx?/i.test(prompt)&&!/과제카드|공개설정|비공개|수신자\s*지정|자동\s*발송|본문.{0,12}(?:서식|그대로|보존)/.test(prompt);
  for(const tool of tools){
+  if(tool.name==='gyomu_wxs_prepare'&&window&&typeof status?.value?.title==='string'){
+   tool.parameters.properties.hwnd={type:'string',enum:[String(window.hwnd)]};tool.parameters.required=[...new Set([...(tool.parameters.required||[]),'hwnd'])];const config=tool.parameters.properties.config;if(config?.properties){config.properties.expected_title={type:'string',enum:[status.value.title]};config.required=[...new Set([...(config.required||[]),'expected_title'])];}
+  }
+  if(tool.name==='gyomu_wxs_prepare'&&task.writing){
+   const config=tool.parameters.properties.config,literals={title:prompt.match(/제목(?:은|으로|:|：)?\s*["“]([^"”]+)["”]/)?.[1],body:prompt.match(/본문(?:은|으로|:|：)?\s*["“]([^"”]+)["”]/)?.[1]};
+   if(config?.properties)for(const [key,value]of Object.entries(literals))if(value){config.properties[key]={type:'string',enum:[value]};config.required=[...new Set([...(config.required||[]),key])];}
+   if(literals.body&&config?.properties&&!/과제|수신|결재.{0,12}(?:추가|지정|변경|바꾸)|공개|비공개|관인|발송|첨부/.test(prompt))config.properties=Object.fromEntries(Object.entries(config.properties).filter(([k])=>['expected_title','title','body','save_name'].includes(k)));
+  }
   if(tool.name==='gyomu_wxs_prepare'&&basic){const config=tool.parameters.properties.config;if(!config?.properties)continue;config.properties=Object.fromEntries(Object.entries(config.properties).filter(([key])=>['expected_title','title','body','attachments'].includes(key)));const title=prompt.match(/제목\s*[:：]?\s*["“]([^"”]+)["”]/)?.[1]||prompt.match(/제목\s+([^,\n]+),/)?.[1];if(title)config.properties.title={type:'string',enum:[title.trim()]};if(/첨부(?:해|하|하고|해서)/.test(prompt)){config.required=[...new Set([...(config.required||[]),'attachments'])];config.properties.attachments.minItems=1;}if(/기안문.{0,12}(?:작성|만들)|본문.{0,40}(?:작성|만들)/.test(prompt))config.required=[...new Set([...(config.required||[]),'body'])];if(window){tool.parameters.properties.hwnd={type:'string',enum:[String(window.hwnd)]};if(typeof status?.value?.title==='string')config.properties.expected_title={type:'string',enum:[status.value.title]};}}
  }
+ if(task.writing&&!task.documentCreate&&!applied&&window&&status&&/(?:제목|본문)(?:은|으로|:|：)?\s*["“][^"”]+["”]/.test(prompt)&&tools.some(t=>t.name==='gyomu_wxs_prepare'))return {...step,tools:tools.filter(t=>t.name==='gyomu_wxs_prepare'),required:true,instructions:'사용자가 지정한 제목·본문을 아직 입력하지 않았다. 실제 창과 원래 제목에 맞춰 WXS 입력 도구를 먼저 실행한다. 입력 전 임시저장을 완료로 대신하지 않는다.'};
  return {...step,tools:applied?tools.filter(t=>t.name!=='gyomu_wxs_prepare'):tools};
 }
 module.exports={wxsStep,validateWxsBody};

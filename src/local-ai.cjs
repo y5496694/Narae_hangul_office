@@ -84,7 +84,11 @@ class LocalAI{
   if(managed&&this.active.id==='narae4'){
    const goal=(body.input||[]).findLast(i=>i.role==='user'&&!/^(?:아래는 실제 도구|도구 관찰 결과:)/.test(textOf(i.content))),text=textOf(goal?.content);
    const create=tools.find(t=>t.name==='create_document');
-   if(create&&!/표\s*(?:를|로|형식|구조|작성|생성|만들|삽입|추가|가\s*있)|테이블|이미지|사진|그림|서명|서식|스타일|글꼴|굵게|정렬|블록|blocks/i.test(text)){delete create.parameters.properties.blocks;create.parameters.required=['path','text'];create.description+=' 일반 문서는 text에 실제 본문과 줄바꿈을 전달하세요.';}
+   if(create?.parameters?.properties){
+    if(!/용지|여백|A[345]|가로|세로/.test(text))delete create.parameters.properties.page;
+    if(/훈련용|실제.{0,12}(?:학교\s*)?일정.{0,8}아님/.test(text)){create.parameters.properties.notice={type:'string',enum:['훈련용 가상 자료이며 실제 학교 일정이 아닙니다.']};create.parameters.required=[...new Set([...(create.parameters.required||[]),'notice'])];}
+   }
+   if(create&&!/표\s*(?:를|로|형식|구조|작성|생성|만들|삽입|추가|가\s*있)|테이블|이미지|사진|그림|서명|서식|스타일|글꼴|굵게|정렬|블록|blocks/i.test(text)){delete create.parameters.properties.blocks;create.parameters.required=[...new Set([...(create.parameters.required||[]),'path','title','text'])];create.description+=' 일반 문서는 title에 요청한 큰 제목, text에 제목을 제외한 실제 본문을 전달하세요.';}
   }
   const messages=messagesFor({...body,tools});if(managed)await this.fitMessages(messages,signal);
   this.lastRoute='main';
@@ -97,7 +101,7 @@ class LocalAI{
     catch(error){await this.decision.stop();if(signal?.aborted)throw error;this.lastRoute='main-decision-unavailable';}
    }
   }
-  const result=await this.api(url+'/chat/completions',{model,messages,temperature:0,seed:719,...(managed&&this.active.projector?{chat_template_kwargs:{enable_thinking:true}}:{}),max_tokens:Math.min(2048,Math.max(128,body.max_output_tokens||2048)),stream:false,response_format:{type:'json_schema',json_schema:{name:'narae_action',schema:plannerSchema(tools,body.tool_choice==='required')}}},signal,180000,managed);
+  const result=await this.api(url+'/chat/completions',{model,messages,temperature:0,seed:719,...(managed&&this.active.projector?{chat_template_kwargs:{enable_thinking:body.evidenceReport!==true}}:{}),max_tokens:Math.min(2048,Math.max(128,body.max_output_tokens||2048)),stream:false,response_format:{type:'json_schema',json_schema:{name:'narae_action',schema:plannerSchema(tools,body.tool_choice==='required')}}},signal,180000,managed);
   if(result.model!==model)throw new Error('요청과 다른 로컬 모델의 응답입니다.');return checkRepeated(responseFrom(result,tools),prior);
  }
  cancelInstall(){this.abort?.abort();}

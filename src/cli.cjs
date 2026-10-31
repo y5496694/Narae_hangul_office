@@ -38,7 +38,8 @@ async function lock(home,file,operation){
  fs.writeFileSync(path.join(target,'owner.json'),JSON.stringify({pid:process.pid,at:new Date().toISOString(),file}));
  try{return await operation();}finally{fs.rmSync(target,{recursive:true,force:true});}
 }
-async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOME||path.join(process.env.LOCALAPPDATA||os.homedir(),'NaraeHangulOffice'),python=require('./runtime-python.cjs').resolvePython(root)}={}){
+async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOME||path.join(process.env.LOCALAPPDATA||os.homedir(),'NaraeHangulOffice'),python=require('./runtime-python.cjs').resolvePython(root),signal}={}){
+ if(signal?.aborted)throw new Error('작업을 중지했습니다.');
  const req=normalize(job,base),action=req.action;
  if(action==='schema')return {schema:1,actions:['doctor','inspect','create','edit','insert-signature','export','open','list','live-read','live-edit','install-skill'],agent:{command:'agent <job.json|-> [--result result.json]',required:['prompt','workspace'],defaultModel:'narae4',optional:['schema','model','context','history','allowChanges','save'],promptMaxChars:4000,historyMaxMessages:12,allowChangesDefault:false,source:'managed local models; same agent and school integrations as the app'},signature:{action:'insert-signature',required:['input','output','expected_input_sha256','image_path','anchor_text','x_mm','y_mm'],optional:['width_mm','height_mm','expected_count','occurrence'],placement:'paper top-left, mm; TreatAsChar=false; TextWrap=BehindText'},...require('./hwp-file-contracts.cjs')};
  if(action==='install-skill')return require('../scripts/install-skills.cjs').install({appRoot:root,directory:req.directory});
@@ -49,7 +50,7 @@ async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOM
  }
  if(!fs.existsSync(python))throw new Error('앱 런타임이 없습니다. 설치.cmd를 실행하세요.');
  for(const folder of ['cache','data/backups','backups'])fs.mkdirSync(path.join(home,folder),{recursive:true});
- const native=new NativeDocuments(home,python),doc=input=>runPython(python,home,'documents.py',input);
+ const native=new NativeDocuments(home,python),doc=input=>runPython(python,home,'documents.py',input,signal);
  try{
   if(action==='list')return await native.list();
   require('./format-policy.cjs').assertDocument(req.path||'');
@@ -58,7 +59,7 @@ async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOM
    if(action==='live-read'||action==='live-edit'){
     if(action==='live-edit'&&!req.liveRevision)throw new Error('직전 live-read의 liveRevision이 필요합니다.');
     await native.openFile(req.path);
-    return await native.withFileLock(req.path,()=>runPython(python,home,'live_hangul.py',{...req,action:action==='live-read'?'read':'edit',save:req.save!==false,backupDir:path.join(home,'backups')}));
+    return await native.withFileLock(req.path,()=>runPython(python,home,'live_hangul.py',{...req,action:action==='live-read'?'read':'edit',save:req.save!==false,backupDir:path.join(home,'backups')},signal));
    }
    if(action==='create')return {output:req.path,...await doc({...req,action:'create'})};
    if(action==='insert-signature'){

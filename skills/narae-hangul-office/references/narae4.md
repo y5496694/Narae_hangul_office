@@ -1,5 +1,9 @@
 # 나래4 CLI
 
+preview.19부터 앱과 CLI의 저장 문서 도구는 같은 실행기를 사용한다. `read_document`의 `offset/limit`와 실제 `hasMore/nextOffset`으로 이어 읽고, `create_document`의 `title/text/blocks/page`로 제목·본문·표·그림·용지·여백을 지정한다. `notice`는 본문에 포함할 필수 안내문이다. 훈련용 요청의 실제 일정 아님 표시를 생략하지 않는다. `edit_document`의 `target`은 작업 폴더 안의 새 사본 경로이며 원본 수정에는 넣지 않는다. 비한글 저장 첨부는 `gyomu_wxs_attachment`로 형식별 읽기를 수행한다. 이 도구 연결을 Codex와 동일한 추론 능력이나 모든 기능의 실학교 검증으로 설명하지 않는다.
+
+로컬 교무 요약은 나래4가 `report_evidence`로 실제 읽은 원문 구절 ID를 선택하고 실행기가 검증·표시한다. 기한·제출처·취소 등 주요 구절과 첨부 미확인, 실제 목록의 조회 범위를 보존한다. 모델 구절 선택 실패 시 확인한 원문 발췌임을 명시한다. 조회·읽음·실제 업무 완료를 혼동하지 않는다. 임시저장 후 같은 창의 재조회가 확인되면 같은 저장·상태 조회를 반복하지 않는다.
+
 설치된 나래 한글 오피스의 `narae-office.cmd agent-status` 또는 `narae-gyomu office agent-status`로 나래4가 installed:true인지 확인한다. 이 명령은 가중치를 로드하지 않는다. 나래4 작업은 다음 JSON을 UTF-8로 저장한다.
 
 ```json

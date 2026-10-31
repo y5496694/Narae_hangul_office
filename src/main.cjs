@@ -25,20 +25,19 @@ async function configure(args={}){const changesAI=Object.keys(args).some(key=>![
 async function selected(file){file=document(file);recent=[file,...recent.filter(item=>item!==file)].slice(0,30);save('recent.json',recent);return {path:file,name:path.basename(file),hash:createHash('sha256').update(fs.readFileSync(file)).digest('hex')};}
 const execute=async(name,args,signal)=>{
  if(signal?.aborted)throw new Error('작업을 중지했습니다.');
- if(name==='list_files')return fs.readdirSync(settings.workspace).filter(file=>/\.(hwpx?|png|jpe?g|gif|webp)$/i.test(file)).map(file=>path.join(settings.workspace,file));
+ if(name==='list_files')return require('./document-tools.cjs').executeDocumentTool(name,args,{workspace:settings.workspace});
  if(name==='read_image'){const file=authorise(args.path);return {kind:'image',path:file,image:require('./agent-media.cjs').readImage(file)};}
  const file=['create_document'].includes(name)?output(args.path):document(args.path);
- if(name==='read_document')return native.savedFileOperation(file,{},()=>runPython(python,home,'documents.py',{action:'inspect',path:file},signal));
+ if(name==='read_document'||name==='edit_document')return require('./document-tools.cjs').executeDocumentTool(name,{...args,path:file,...(args.target?{target:output(args.target)}:{})},{workspace:settings.workspace,home,python,signal});
  if(name==='read_live_document'||name==='edit_live_document'){
   await native.openFile(file);
   return native.withFileLock(file,()=>runPython(python,home,'live_hangul.py',{...args,path:file,action:name==='read_live_document'?'read':'edit',backupDir:path.join(home,'backups'),save:settings.hwpAutoSave!==false},signal));
  }
- if(name==='edit_document')return native.savedFileOperation(file,{editing:true,signal},()=>runPython(python,home,'documents.py',{...args,path:file,action:'save'},signal));
  if(name==='create_document'){
   require('./format-policy.cjs').assertDocument(file);
   const blocks=args.blocks;
   const checkImages=items=>{for(const item of items||[]){if(item.type==='image'){item.path=authorise(item.path);if(!fs.existsSync(item.path))throw new Error('그림 파일을 찾을 수 없습니다.');}for(const row of item.rows||[])for(const cell of row)checkImages(cell.blocks);}};checkImages(blocks);
-  const result=await runPython(python,home,'documents.py',{action:'create',path:file,content:args.text||'',...(blocks?{blocks}:{})},signal);await selected(file);return result;
+  const result=await require('./document-tools.cjs').executeDocumentTool(name,{...args,path:file},{workspace:settings.workspace,home,python,signal});await selected(file);return result;
  }
  if(name==='export_pdf')return native.savedFileOperation(file,{},()=>runPython(python,home,'documents.py',{action:'export',path:file,target:output(args.target)},signal));
  throw new Error('지원하지 않는 문서 작업입니다.');
