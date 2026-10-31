@@ -8,8 +8,8 @@ for(const [name,expected] of Object.entries(manifest.files))if(sha(path.join(sou
 if(sha(path.join(source,'evaluation/heldout-cases.json'))!==manifest.heldoutSha256)throw Error('Heldout hash mismatch');
 const retention=JSON.parse(fs.readFileSync(path.join(source,'evaluation/retention-freeze.json')));
 if(sha(path.join(source,'evaluation/retention-cases.json'))!==retention.sha256)throw Error('Retention hash mismatch');
-for(const dir of ['data','evaluation','scripts','logs','outputs','exports','cache/features','tmp'])fs.mkdirSync(path.join(target,dir),{recursive:true});
-for(const [from,to] of [['datasets','data'],['evaluation','evaluation'],['scripts','scripts']])for(const item of fs.readdirSync(path.join(source,from),{withFileTypes:true})){if(item.isFile())fs.copyFileSync(path.join(source,from,item.name),path.join(target,to,item.name));}
+for(const dir of ['data','evaluation','scripts','fixtures','logs','outputs','exports','cache/features','tmp'])fs.mkdirSync(path.join(target,dir),{recursive:true});
+for(const [from,to] of [['datasets','data'],['evaluation','evaluation'],['scripts','scripts'],['fixtures','fixtures']])for(const item of fs.readdirSync(path.join(source,from),{withFileTypes:true})){if(item.isFile())fs.copyFileSync(path.join(source,from,item.name),path.join(target,to,item.name));}
 const base=JSON.parse(fs.readFileSync(path.join(source,'base-manifest.json')));
 if(process.env.NARAE_TRAIN_START_ADAPTER)manifest.startingAdapter=path.resolve(process.env.NARAE_TRAIN_START_ADAPTER);
 if(process.env.NARAE_TRAIN_BASE){base.destination=path.resolve(process.env.NARAE_TRAIN_BASE);const file=path.join(target,'scripts/train.py');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace("Path('D:/Codex/models/Qwen3.5-2B-HF')",'Path('+JSON.stringify(base.destination.replaceAll('\\','/'))+')'));}

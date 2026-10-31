@@ -24,6 +24,9 @@ python -X utf8 D:/Codex/training/narae4-v3-reproduction/scripts/train.py
 python -X utf8 D:/Codex/training/narae4-v3-reproduction/scripts/export.py
 node D:/Codex/training/narae4-v3-reproduction/scripts/evaluate.cjs trained
 node D:/Codex/training/narae4-v3-reproduction/scripts/evaluate.cjs trained --retention
+node D:/Codex/training/narae4-v3-reproduction/scripts/workflows.cjs
 ```
+
+`workflows.cjs`는 별도 후보 설치에서 실제 나래4 가중치와 HWPX 생성·수정·그림 분석을 사용한다. 학교 화면·쪽지·공문 응답은 가상 자료다. 기존 5개 기초 에이전트 흐름은 `NARAE_BENCH_CANDIDATE`에 내보낸 GGUF 절대 경로, `NARAE_BENCH_ALIAS`에 후보 이름을 지정하고 `experiments/narae-office-basic-10-20261031/run.cjs`로 실행한다. 두 시험 모두 기존 모델을 덮어쓰지 않으며 전체 10과제 실환경 합격과 구분한다.
 
 학습과 추론 서버를 동시에 시작하지 않는다. 각 평가 실행기는 자신의 서버만 종료하며 사용자의 다른 모델 프로세스를 종료하지 않는다. 실제 실행의 스크립트·파일 해시와 환경 버전은 결과 보고서에 보존한다.
