@@ -1,9 +1,26 @@
 'use strict';
 const path=require('node:path');
-function documentStep(prompt,input,all,workspace,allowReceipt=false){
- if(!/PDF\s*(?:사본|버전)|PDF\s*(?:로|으로)\s*(?:출력|내보내|저장|변환)|PDF(?:도|까지)?\s*(?:만들|생성)|\.pdf["”]?/i.test(prompt)||/PDF.{0,12}(?:하지\s*마|만들지\s*마|필요\s*없)/i.test(prompt))return null;
+function documentStep(prompt,input,all,workspace,allowReceipt=false,selectedFile){
  const records=[];for(const item of input){if(item.type!=='function_call_output')continue;const call=input.find(c=>c.type==='function_call'&&c.call_id===item.call_id);if(!call)continue;try{records.push({name:call.name,args:JSON.parse(call.arguments),value:JSON.parse(item.output)});}catch{}}
  if(records.some(r=>r.value?.finalAction||/^wxs-final/.test(r.value?.kind||'')))return null;
+ const tracked=records.findLast(r=>r.name==='read_document'&&!r.value?.error&&r.value?.textDetailsLoaded===false);
+ if(tracked&&typeof tracked.args.path==='string'&&!records.slice(records.indexOf(tracked)+1).some(r=>r.name==='read_live_document'&&r.args.path===tracked.args.path)){
+  const tool=structuredClone(all.find(t=>t.name==='read_live_document'));
+  if(tool){tool.parameters={type:'object',properties:{path:{type:'string',enum:[tracked.args.path]}},required:['path'],additionalProperties:false};return {tools:[tool],required:true,context:{source:'파일 엔진에서 변경 추적 때문에 현재 본문을 읽지 못한 실제 문서',path:tracked.args.path},instructions:'textDetailsLoaded:false는 빈 문서가 아니다. read_live_document로 현재 한글의 실제 본문과 liveRevision을 읽는다. 읽겠다는 답변으로 도구 실행을 대신하지 않는다.'};}
+ }
+ if(typeof selectedFile==='string'&&/수정|고쳐|바꾸|바꿔|변경|굵게|글꼴|서식/.test(prompt)&&!/열려\s*있|열린\s*한글|실시간|현재\s*한글/.test(prompt)){
+  const same=p=>typeof p==='string'&&path.resolve(p).toLowerCase()===path.resolve(selectedFile).toLowerCase();
+  const read=records.findLast(r=>r.name==='read_document'&&same(r.args.path)&&!r.value?.error),edit=records.findLast(r=>['edit_document','edit_live_document'].includes(r.name)&&same(r.args.path));
+  if(!read||edit&&records.indexOf(edit)>records.indexOf(read)){
+   const tool=structuredClone(all.find(t=>t.name==='read_document'));if(tool){tool.parameters={type:'object',properties:{path:{type:'string',enum:[selectedFile]}},required:['path'],additionalProperties:false};return {tools:[tool],required:true,context:{source:'사용자가 선택한 실제 문서',path:selectedFile},instructions:'편집 전 또는 편집 시도 후에는 선택한 파일을 실제로 다시 읽어 최신 해시·문단 ID·저장된 내용을 확인한다.'};}
+  }
+  if(read?.value?.textDetailsLoaded!==false&&(read?.value?.hash||read?.value?.input_sha256)){
+   const tools=structuredClone(all.filter(t=>['edit_document',...(read.value.hasMore?['read_document']:[]),...(/PDF/i.test(prompt)?['export_pdf']:[])].includes(t.name))),tool=tools.find(t=>t.name==='edit_document');
+   if(tool){tool.parameters.properties.path={type:'string',enum:[selectedFile]};tool.parameters.properties.expectedHash={type:'string',enum:[read.value.hash||read.value.input_sha256]};tool.parameters.required=['path','expectedHash','operations'];const ids=[...new Set([...(read.value.paragraphs||[]),...(read.value.blocks||[])].map(p=>p.id).filter(Boolean))];if(ids.length)for(const op of tool.parameters.properties.operations.items.anyOf)if(op.properties?.target)op.properties.target={type:'string',enum:ids};}
+   return {tools,instructions:'선택 파일은 방금 일반 파일 엔진으로 읽었다. 같은 파일의 같은 내용을 다시 읽지 않는다. 실제 해시와 문단 ID로 edit_document를 사용한다. 저장 후 다시 읽은 내용이 이미 요청대로 바뀌었으면 도구를 호출하지 말고 최종 확인 결과를 답한다. liveRevision을 파일 해시로 지어내지 않는다.'};
+  }
+ }
+ if(!/PDF\s*(?:사본|버전)|PDF\s*(?:로|으로)\s*(?:출력|내보내|저장|변환)|PDF(?:도|까지)?\s*(?:만들|생성)|\.pdf["”]?/i.test(prompt)||/PDF.{0,12}(?:하지\s*마|만들지\s*마|필요\s*없)/i.test(prompt))return null;
  const created=records.filter(r=>r.name==='create_document'&&!r.value?.error&&r.value?.modeledContentVerified&&r.value?.path);
  if(created.length!==1)return null;
  const file=created[0].value.path,same=p=>typeof p==='string'&&path.resolve(p).toLowerCase()===path.resolve(file).toLowerCase();

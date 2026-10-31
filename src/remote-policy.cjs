@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{randomBytes,createHash}=require('node:crypto');
 const {inside,tools}=require('./agent.cjs');
-const READ=new Set(['list_files','read_document','read_live_document']);
+const READ=new Set(['list_files','read_document','read_live_document','read_image']);
 function validate(value,schema,depth=0,location='args'){
  if(depth>20)throw new Error('원격 도구 인자가 너무 깊습니다.');
  if(schema.anyOf){if(!schema.anyOf.some(option=>{try{validate(value,option,depth+1,location);return true;}catch{return false;}}))throw new Error('지원하지 않는 변경 인자입니다.');return;}
