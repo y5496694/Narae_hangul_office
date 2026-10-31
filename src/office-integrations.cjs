@@ -33,6 +33,7 @@ class OfficeIntegrations{
   if(tool.original==='skill.read'&&args.document){const resolved=path.resolve('/',args.document);if(path.isAbsolute(args.document)||args.document.split(/[\\/]/).includes('..')||!resolved)throw new Error('스킬 내부 참조 문서만 읽을 수 있습니다.');}
   const register=file=>{const allowed=this.policy.allowed(file);this.instance.register([allowed]);return allowed;};
   if(args.files)args.files=args.files.map(register);
+  if(tool.original==='wxs.attachment')args.path=register(args.path);
   if(args.config?.body_file)args.config.body_file=register(args.config.body_file);
   if(args.config?.body_hwp)args.config.body_hwp.path=register(args.config.body_hwp.path);
   if(args.config?.attachments)args.config.attachments=args.config.attachments.map(register);

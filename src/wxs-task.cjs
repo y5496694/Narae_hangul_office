@@ -24,6 +24,13 @@ function wxsStep(prompt,input,step,task){
   return {...step,tools:tools.filter(t=>['gyomu_browser','gyomu_wxs'].includes(t.name)),instructions:'이 확인창은 자동 수락 가능한 일반 상신·결재 확인으로 검증되지 않았다. 문구와 현재 상태를 보고하고 재상신·별도 수락을 하지 않는다.'};
  }
  if(confirmed&&!records.some(r=>r.name==='gyomu_browser'&&records.indexOf(r)>records.indexOf(confirmed)&&!r.value?.error))return required('gyomu_browser',{action:'snapshot'},'최종 확인 뒤 현재 문서진행 목록의 제목·상태·결재자를 실제 재조회한다.');
+ const saveAttempt=native.findLast(r=>r.name==='gyomu_wxs_save'||r.name==='gyomu_wxs_prepare'&&r.value?.ok&&(r.value.result?.saved===true||r.value.result?.save?.saved===true));
+ if(saveAttempt){
+  const reread=native.findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='draft-status'&&String(r.args.hwnd)===String(saveAttempt.args.hwnd)&&native.indexOf(r)>native.indexOf(saveAttempt));
+  if(!reread)return required('gyomu_wxs',{operation:'draft-status',hwnd:saveAttempt.args.hwnd},'임시저장을 이미 한 번 시도했다. 같은 창의 실제 상태를 다시 읽고 재저장하지 않는다.');
+  if(saveAttempt.value.error||!saveAttempt.value.ok||!(saveAttempt.value.result?.saved===true||saveAttempt.value.result?.save?.saved===true)||reread.value.error)return {tools:[],receipt:'기안 임시저장을 시도했지만 완료를 확인하지 못했습니다. '+(saveAttempt.value.error||reread.value.error||'저장 결과 미확인')+'\n같은 창의 상태를 재조회했으며 같은 저장을 반복하거나 상신하지 않았습니다.'};
+  return {...step,tools:tools.filter(t=>!['gyomu_wxs_save','gyomu_wxs_prepare','gyomu_wxs_options'].includes(t.name)),instructions:(step.instructions||'')+' 임시저장 시도 뒤 같은 초안을 다시 읽었다. 같은 저장이나 본문 입력을 반복하지 않고 실제 결과·목록 확인 범위만 보고한다.'};
+ }
  const direct=/현재\s*열린\s*WXS|이미\s*열린\s*WXS/i.test(prompt),listing=native.findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='windows'&&!r.value?.error),windows=listing?.value?.windows||[];
  if(direct&&!listing&&tools.some(t=>t.name==='gyomu_wxs_prepare'))return required('gyomu_wxs',{operation:'windows'},'현재 열린 WXS의 실제 제목과 HWND부터 조회한다. 핸들을 추측하거나 다른 문서를 열지 않는다.');
  const window=windows.length===1?windows[0]:null,status=native.findLast(r=>r.name==='gyomu_wxs'&&r.args.operation==='draft-status'&&!r.value?.error),applied=native.findLast(r=>r.name==='gyomu_wxs_prepare'&&r.value?.ok);

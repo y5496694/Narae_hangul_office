@@ -18,12 +18,13 @@ function localCreationResult(prompt,settings,calls,name,output){
  // Confirm one explicit file from the engine; small models can otherwise repeat
  // a successful creation. Multi-step requests still go through the agent loop.
  if(settings.provider!=='local'||calls.length!==1||name!=='create_document'||!output?.modeledContentVerified||!output.path)return null;
- if((prompt.match(/\.(?:hwpx|hwp)\b/gi)||[]).length!==1||!/만들|작성|생성/.test(prompt)||/수정|편집|고쳐|읽고|요약|검토|비교|PDF|전송|보내|첨부|기안|상신|결재|승인|임시저장|이어서|그다음|그 다음|여러|각각|두 개|2개/i.test(prompt))return null;
+ if((prompt.match(/\.(?:hwpx|hwp)\b/gi)||[]).length!==1||!/만들|작성|생성/.test(prompt)||/수정|편집|고쳐|읽고|요약|검토(?:해|하|도|를|부탁)|비교|PDF|전송|보내|첨부|기안|상신|결재|승인|임시저장|이어서|그다음|그 다음|여러|각각|두 개|2개/i.test(prompt))return null;
  return '문서 파일을 만들었습니다.\n'+output.path+'\n나래한글 엔진에서 저장한 내용을 다시 읽어 대조했습니다.';
 }
 async function runAgent({prompt,context,settings,request,execute,send,signal,history=[],additionalTools=[],agentInstructions=''}){
  const task=additionalTools.some(t=>t.name==='gyomu_browser')?taskFor(prompt,history):null;
- const availableTools=taskTools(task,[...tools,...additionalTools]);
+ const documentOnly=!task&&(/\.hwpx?$/i.test(context||'')||/한글|HWP|\.hwpx?\b|\.(?:png|jpe?g|gif|webp)\b|read_image|그림|사진|이미지/i.test(prompt))&&!/브라우저|웹\s*(?:검색|탐색)|웹사이트|사이트\s*(?:열|접속)/.test(prompt);
+ const availableTools=taskTools(task,[...tools,...additionalTools.filter(t=>!documentOnly||['gyomu_skill_read','gyomu_system_status'].includes(t.name))]);
  const relevantHistory=['cbe','edufine','neis','portal'].includes(task?.area)&&!/^(계속|응|네|진행|다음|로그인.*완료|보내|사유)/.test(prompt.trim())?[]:history;
  const input=relevantHistory.slice(-12).filter(item=>['user','assistant'].includes(item.role)).map(item=>({role:item.role,content:item.content}));
  input.push({role:'user',content:prompt+(context?'\n선택 문서: '+context:'')});

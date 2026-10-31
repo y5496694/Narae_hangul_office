@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Agent-facing document commands. No Electron, provider login, or paid AI call.
+// Document jobs need no AI. The headless agent uses installed local models.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {createHash,randomUUID}=require('node:crypto');
 const {runPython}=require('./python.cjs'),{NativeDocuments}=require('./native-documents.cjs');
@@ -40,7 +40,7 @@ async function lock(home,file,operation){
 }
 async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOME||path.join(process.env.LOCALAPPDATA||os.homedir(),'NaraeHangulOffice'),python=require('./runtime-python.cjs').resolvePython(root)}={}){
  const req=normalize(job,base),action=req.action;
- if(action==='schema')return {schema:1,actions:['doctor','inspect','create','edit','insert-signature','export','open','list','live-read','live-edit','install-skill'],signature:{action:'insert-signature',required:['input','output','expected_input_sha256','image_path','anchor_text','x_mm','y_mm'],optional:['width_mm','height_mm','expected_count','occurrence'],placement:'paper top-left, mm; TreatAsChar=false; TextWrap=BehindText'},...require('./hwp-file-contracts.cjs')};
+ if(action==='schema')return {schema:1,actions:['doctor','inspect','create','edit','insert-signature','export','open','list','live-read','live-edit','install-skill'],agent:{command:'agent <job.json|-> [--result result.json]',required:['prompt','workspace'],defaultModel:'narae4',optional:['schema','model','context','history','allowChanges','save'],promptMaxChars:4000,historyMaxMessages:12,allowChangesDefault:false,source:'managed local models; same agent and school integrations as the app'},signature:{action:'insert-signature',required:['input','output','expected_input_sha256','image_path','anchor_text','x_mm','y_mm'],optional:['width_mm','height_mm','expected_count','occurrence'],placement:'paper top-left, mm; TreatAsChar=false; TextWrap=BehindText'},...require('./hwp-file-contracts.cjs')};
  if(action==='install-skill')return require('../scripts/install-skills.cjs').install({appRoot:root,directory:req.directory});
  if(action==='doctor'){
   const hancom=require('./hancom.cjs').discoverHancom(),available=fs.existsSync(python);
@@ -79,7 +79,7 @@ async function execute(job,{base=process.cwd(),home=process.env.NARAE_OFFICE_HOM
   });
  }finally{native.close();}
 }
-const usage='narae-office doctor | schema | install-skill | run <job.json|-> [--result result.json] | inspect <file> [--full] [--offset N --limit N] | live-read <file> | open <file> | list | export <file> --pdf <new.pdf>\ncreate/edit/live-edit: run 작업 JSON을 사용하세요. 기본 읽기는 compact JSON이며 --full로 전체 서식을 받습니다. 실패 종료코드는 1입니다.';
+const usage='narae-office doctor | schema | install-skill | agent-status | agent <job.json|-> [--result result.json] | run <job.json|-> [--result result.json] | inspect <file> [--full] [--offset N --limit N] | live-read <file> | open <file> | list | export <file> --pdf <new.pdf>\nagent JSON: {"prompt":"요청","workspace":"D:/Codex/workspaces/문서","model":"narae4","allowChanges":false}. 설치된 로컬 모델만 사용합니다. 변경·브라우저 조작은 allowChanges:true일 때 허용합니다.\ncreate/edit/live-edit: run 작업 JSON을 사용하세요. 기본 읽기는 compact JSON이며 --full로 전체 서식을 받습니다. 실패 종료코드는 1입니다.';
 async function main(argv=process.argv.slice(2)){
  let output,response;
  try{
@@ -88,15 +88,18 @@ async function main(argv=process.argv.slice(2)){
   const result=take('--result'),fullIndex=args.indexOf('--full'),full=fullIndex>=0;
   if(full)args.splice(fullIndex,1);
   const offset=take('--offset'),limit=take('--limit');let job,base=process.cwd(),jobFile;
-  if(action==='run'){
+  if(action==='run'||action==='agent'){
    const file=args.shift();if(!file)throw new Error('작업 JSON 경로 또는 -를 지정하세요.');
    if(file!=='-'){jobFile=path.resolve(file);base=path.dirname(jobFile);}
    job=JSON.parse(fs.readFileSync(jobFile||0,'utf8').replace(/^\uFEFF/,''));
   }else{const pdf=take('--pdf');job={schema:1,action};if(!['doctor','schema','list','install-skill'].includes(action))job.path=args.shift();if(pdf)job.target=pdf;}
   if(full)job.full=true;if(offset!==undefined)job.offset=Number(offset);if(limit!==undefined)job.limit=Number(limit);
   if(args.length)throw new Error('알 수 없는 인자: '+args.join(' '));
-  output=resultPath(result,job,base,jobFile);
-  response={success:true,...await execute(job,{base})};
+  output=resultPath(result,action==='agent'?{...job,input:job.context?path.resolve(base,job.workspace,job.context):undefined}:job,base,jobFile);
+  if(action==='agent'||action==='agent-status'){
+   const agent=require('./agent-cli.cjs'),controller=new AbortController(),cancel=()=>controller.abort();process.once('SIGINT',cancel);
+   try{response={success:true,...await (action==='agent-status'?agent.status():agent.run(job,{base,signal:controller.signal,onEvent:event=>{if(event.type==='tool'||event.type==='status')process.stderr.write(JSON.stringify(event)+'\n');}}))};}finally{process.removeListener('SIGINT',cancel);}
+  }else response={success:true,...await execute(job,{base})};
  }catch(error){response={success:false,error:error.message};}
  try{writeResult(output,response);}catch(error){response={success:false,error:'결과 JSON 저장 실패: '+error.message,operationResult:response};}
  process.stdout.write(JSON.stringify(response,null,2)+'\n');return response.success?0:1;

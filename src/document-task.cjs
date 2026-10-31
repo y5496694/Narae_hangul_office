@@ -1,5 +1,17 @@
 'use strict';
 const path=require('node:path');
+function verifiedTimeChange(prompt,records,edit,read,same){
+ if(!/만(?:\s|바꾸|고쳐|수정|변경)/.test(prompt)||/PDF|첨부|전송|보내|기안|상신|결재|나이스|복무|메신저|쪽지|이어서|그다음|비교|요약|여러|각각|다른\s*(?:문서|파일)|검토(?:해|하|도|부탁)/i.test(prompt))return null;
+ const times=[...prompt.matchAll(/\b([0-2]?\d:[0-5]\d)\b/g)].map(m=>m[1]);if(times.length!==2||times[0]===times[1]||!edit?.value.saved||edit.value.modeledContentVerified===false)return null;
+ const ops=edit.args.operations;if(ops?.length!==1||ops[0].op!=='replace_text')return null;const op=ops[0];
+ if(op.expected!==1||typeof op.find!=='string'||!op.find.includes(times[0])||op.replace!==op.find.replace(times[0],times[1]))return null;
+ const before=records.slice(0,records.indexOf(edit)).findLast(r=>r.name==='read_document'&&same(r.args.path)&&!r.value.error);
+ if(!before||before.value.hasMore||read.value.hasMore||before.value.textDetailsLoaded===false||read.value.textDetailsLoaded===false)return null;
+ if((before.value.hash||before.value.input_sha256)!==edit.args.expectedHash||(read.value.hash||read.value.input_sha256)!==edit.value.hash)return null;
+ const a=before.value.paragraphs||before.value.blocks,b=read.value.paragraphs||read.value.blocks;if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length||a.some(p=>typeof p.text!=='string')||b.some(p=>typeof p.text!=='string'))return null;
+ const indexes=a.flatMap((p,i)=>p.id===op.target?[i]:[]);if(indexes.length!==1)return null;const index=indexes[0],expected=a.map(p=>p.text);if(expected[index].split(op.find).length-1!==1)return null;expected[index]=expected[index].replace(op.find,op.replace);
+ return expected.every((s,i)=>s===b[i].text)?{from:times[0],to:times[1]}:null;
+}
 function documentStep(prompt,input,all,workspace,allowReceipt=false,selectedFile){
  const records=[];for(const item of input){if(item.type!=='function_call_output')continue;const call=input.find(c=>c.type==='function_call'&&c.call_id===item.call_id);if(!call)continue;try{records.push({name:call.name,args:JSON.parse(call.arguments),value:JSON.parse(item.output)});}catch{}}
  if(records.some(r=>r.value?.finalAction||/^wxs-final/.test(r.value?.kind||'')))return null;
@@ -14,6 +26,7 @@ function documentStep(prompt,input,all,workspace,allowReceipt=false,selectedFile
   if(!read||edit&&records.indexOf(edit)>records.indexOf(read)){
    const tool=structuredClone(all.find(t=>t.name==='read_document'));if(tool){tool.parameters={type:'object',properties:{path:{type:'string',enum:[selectedFile]}},required:['path'],additionalProperties:false};return {tools:[tool],required:true,context:{source:'사용자가 선택한 실제 문서',path:selectedFile},instructions:'편집 전 또는 편집 시도 후에는 선택한 파일을 실제로 다시 읽어 최신 해시·문단 ID·저장된 내용을 확인한다.'};}
   }
+  const verified=verifiedTimeChange(prompt,records,edit,read,same);if(verified)return {tools:[],receipt:'선택 문서의 시간 변경을 저장하고 다시 읽어 확인했습니다.\n'+selectedFile+'\n'+verified.from+' → '+verified.to+'\n그 밖의 문단 텍스트가 유지된 것도 대조했습니다.'};
   if(read?.value?.textDetailsLoaded!==false&&(read?.value?.hash||read?.value?.input_sha256)){
    const tools=structuredClone(all.filter(t=>['edit_document',...(read.value.hasMore?['read_document']:[]),...(/PDF/i.test(prompt)?['export_pdf']:[])].includes(t.name))),tool=tools.find(t=>t.name==='edit_document');
    if(tool){tool.parameters.properties.path={type:'string',enum:[selectedFile]};tool.parameters.properties.expectedHash={type:'string',enum:[read.value.hash||read.value.input_sha256]};tool.parameters.required=['path','expectedHash','operations'];const ids=[...new Set([...(read.value.paragraphs||[]),...(read.value.blocks||[])].map(p=>p.id).filter(Boolean))];if(ids.length)for(const op of tool.parameters.properties.operations.items.anyOf)if(op.properties?.target)op.properties.target={type:'string',enum:ids};}
