@@ -4,7 +4,11 @@
 
 에듀파인 왼쪽 Nexacro 메뉴는 실제 snapshot의 `nexacroMenu:true`인 트리 항목을 사용한다. 프로그램이 이 항목의 클릭에 DOM 이벤트 방식을 적용한다. '결재' 트리 메뉴와 실제 결재 버튼을 구분하며 메뉴 클릭 뒤에는 실제 업무 프레임 제목으로 전환을 확인한다. 일반 결재·상신 버튼의 최종 확인 절차는 유지한다.
 
-충북은 기존 CBE 전용 CLI를 사용한다. 다른 지역은 `gyomu_regional_messenger`의 status부터 확인하고 해당 지역 앱의 실제 PID·HWND·실행 파일을 bind한다. inspect의 실제 snapshot과 ref만 사용한다. 접근성 미지원 앱은 해당 설치물의 REA 근거를 보고 전용 어댑터를 구현해야 한다. 다른 지역을 충북 세션으로 처리하지 않는다. 실제 업무 시험 지역은 충북이다.
+충북은 기존 CBE 전용 CLI를 사용한다. 다른 지역은 `gyomu_regional_messenger`의 status부터 확인한다. 경기 GOE·경북 GBeeTALK·전북 JBEdu Messenger+는 ULTARI MFC, 강원 이음·경남 아이좋아·제주는 UCWARE Delphi 설치물을 실제 설치·REA 분석한 별도 로컬 DB 드라이버가 포함된다. 제품 설정과 분석한 실행 파일 해시가 일치해야 한다. 같은 실행 파일 이름이나 공통 UIA 연결만으로 지역 제품 지원을 주장하지 않는다.
+
+`accounts(database, kind)`로 실제 캐시의 계정을 확인하고 `bind-store(database, kind, owner)`로 명시한 계정·종류만 연결한다. 이후 notes/note/chats/chat/chat-messages/contacts를 사용한다. 지원 종류는 status의 localKinds를 따른다. 데이터베이스는 오피스 작업 폴더 안의 사용자 제공 사본을 사용한다. 로컬 캐시는 서버 동기화·로그인 성공이 아니며 읽음 처리를 변경하지 않는다. 바이너리 본문은 확인된 텍스트 인코딩 외에는 opaque-binary로 반환한다. 원격 첨부 다운로드와 비충북 실제 전송은 아직 검증되지 않았다. 실제 업무 시험 지역은 충북이다.
+
+다른 제품의 UIA inspect/read는 실제 창의 snapshot/ref에 한정한 수동 관찰이다. 지역 계정과 내부 프로토콜이 없는 상태를 전용 통신 구현 완료로 표시하지 않는다. 다른 지역을 충북 세션으로 처리하지 않는다.
 
 설정 → 일반 → **카톡 프로그램 사용**을 켜면 `gyomu_kakao`가 나타난다. 포함된 kakao-cli의 doctor·방 조회·로드된 메시지·검색·명시한 전송·첨부 전송을 사용한다. doctor의 창 발견은 계정 로그인 확인이 아니다. 보낸 메시지의 submitted_unconfirmed는 서버 수신 확인이 아니다. 같은 요청의 결과 불명 전송을 자동 반복하지 않는다.
 
