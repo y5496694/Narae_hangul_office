@@ -8,6 +8,8 @@ const wxsContinuation=require('./wxs-continuation.cjs');
 const officeBench=require('./office-bench-status.cjs');
 const wxsReview=require('./wxs-review.cjs');
 const wxsLaunch=require('./wxs-launch.cjs');
+const wxsSelection=require('./wxs-selection.cjs');
+const wxsStartup=require('./wxs-startup.cjs');
 const vendor=path.resolve(__dirname,'../vendor/narae-gyomu');
 function browserTool(tool){const copy=structuredClone(tool);copy.parameters.properties.action.enum.push('diagnostics','local-access');copy.parameters.properties.expectedOrigin={type:'string',description:'local-access에서 실제 관찰한 현재 HTTPS 업무포털 또는 에듀파인 origin. 사용자가 맡긴 로컬 인증서 프로그램 연결에만 사용한다.'};copy.description=copy.description.replace('발송·삭제는 지원하지 않는다.','발송과 일반 삭제는 지원하지 않는다. 명시한 회수본 한 건의 삭제는 문서진행에서 정확한 제목·문서 ID·회수 상태·화면 지문을 확인한 경우만 실행하며 서버 재조회 전에는 미완료다. diagnostics는 로컬 연결 권한·로딩·네트워크 오류를 비밀 인자 없이 확인한다. local-access는 사용자가 맡긴 로컬 프로그램 연결을 현재 독립 업무 창의 expectedOrigin 한 곳에만 허용한다.');return copy;}
 class OfficeIntegrations{
@@ -26,7 +28,7 @@ class OfficeIntegrations{
   this.instance.browserCall=args=>this.browserCall(args);
   this.catalog=tools.filter(t=>!t.name.startsWith('hangul.')&&t.name!=='files.list'&&t.name!=='portal.login').map(t=>({type:'function',strict:false,name:'gyomu_'+t.name.replaceAll('.','_'),description:t.description+(t.name.endsWith('.prepare')||t.name==='wxs.save'?' 준비 후 PC에서 실제 미리보기를 승인한 경우에만 적용합니다.':''),parameters:t.parameters,original:t.name}));this.catalog.push(sessionTool);this.keeper=new SchoolSessionKeeper({browser:()=>this.instance.browser,enabled:()=>this.settings().keepSchoolSession!==false,busy:this.busy,notify:state=>{if(state.results.length){fs.mkdirSync(path.join(this.home,'logs'),{recursive:true});fs.appendFileSync(path.join(this.home,'logs/school-session.jsonl'),JSON.stringify({at:state.lastAt,results:state.results})+'\n');}this.notify({type:'schoolSession',state});}});this.keeper.start();return this;
  }
- async tools(){await this.ready();return [...this.catalog.map(({original,...tool})=>original==='wxs'?wxsReview.extend(tool):original==='browser'?browserTool(tool):tool),messengerArchive.tool,portalLogin.tool,wxsContinuation.tool,wxsLaunch.tool,officeBench.tool];}
+ async tools(){await this.ready();return [...this.catalog.map(({original,...tool})=>original==='wxs'?wxsReview.extend(tool):original==='browser'?browserTool(tool):tool),messengerArchive.tool,portalLogin.tool,wxsContinuation.tool,wxsLaunch.tool,wxsSelection.tool,wxsStartup.tool,officeBench.tool];}
  async browserCall(args){if(!this.instance.browser||this.instance.browser.closed){const mode=this.settings().browserMode==='extension'?'extension':'isolated',environment=mode==='extension'?await this.browserEnvironment():{};if(mode==='extension'&&!environment.PLAYWRIGHT_MCP_EXTENSION_TOKEN)throw new Error('설정 → 일반에서 확장 연결 토큰을 저장하거나 기존 Chrome 연결을 먼저 완료하세요.');if(mode==='isolated'&&['snapshot','read','tabs','frames'].includes(args.action))return {notStarted:true,url:'about:blank',title:'열린 업무 브라우저 없음',text:'',elements:[],tabs:[],frames:[],untrusted:true};await this.connectBrowser(mode,{environment});}return this.instance.browser.execute(args);}
  async makeBrowser(mode,{environment}={}){const session=this.session||'local';if(!/^(?:local|[a-f0-9]{32})$/.test(session))throw new Error('브라우저 대화 세션을 확인하세요.');const browser=new this.Browser({profile:this.headed?path.join(this.home,'data/gyomu-browser',session):undefined,connection:mode,connectionDirectory:path.join(this.home,'data/browser-connections',session),environment:environment||await this.browserEnvironment()});try{await browser.start({headed:this.headed});return browser;}catch(error){await browser.browser?.close().catch(()=>{});throw error;}}
  async browserState(){const browser=this.instance?.browser;if(!browser||browser.closed)return {connected:false};return {connected:true,mode:browser.attached?'extension':'isolated',...await browser.execute({action:'tabs'})};}
@@ -35,6 +37,8 @@ class OfficeIntegrations{
  async execute(name,args,signal){
   if(name===officeBench.tool.name){validate(args,officeBench.tool.parameters);return officeBench.status({home:this.home});}
   await this.ready();if(signal?.aborted)throw new Error('작업을 중단했습니다.');
+  if(name===wxsStartup.tool.name){validate(args,wxsStartup.tool.parameters);return wxsStartup.execute(args,{instance:this.instance,policy:this.policy,signal});}
+  if(name===wxsSelection.tool.name){validate(args,wxsSelection.tool.parameters);return wxsSelection.execute(args,{instance:this.instance,policy:this.policy,signal});}
   if(name===wxsLaunch.tool.name){validate(args,wxsLaunch.tool.parameters);if(args.operation==='apply')await this.policy.approve('관찰한 공용서식의 등록 WXS 기안기 실행',{id:args.id,fingerprint:args.fingerprint},signal);return wxsLaunch.execute(args,{root:this.root,python:this.python,instance:this.instance,signal});}
   this.wxsContinuationState||=new Map();
   if(name===wxsContinuation.tool.name){validate(args,wxsContinuation.tool.parameters);return wxsContinuation.execute(args,{instance:this.instance,policy:this.policy,state:this.wxsContinuationState,signal});}
@@ -53,6 +57,7 @@ class OfficeIntegrations{
   if(args.config?.body_hwp)args.config.body_hwp.path=register(args.config.body_hwp.path);
   if(args.config?.attachments)args.config.attachments=args.config.attachments.map(register);
   if(tool.original==='browser'){
+   if(args.action==='click'&&this.instance.browser){const b=this.instance.browser,{locator}=b.ref(args.ref);if(new URL(b.scope().url()).origin==='https://klef.cbe.go.kr'&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))b.externalNativeBaseline=(await this.instance.wxs(['windows'],signal)).windows;}
    if(args.action==='open'){let url;try{url=new URL(args.url);}catch{throw new Error('웹 주소를 확인하세요.');}if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw new Error('HTTP(S) 웹 주소만 지원합니다.');}
    if(['fill','press'].includes(args.action))await this.noCredentialInput(args);
    if(!['snapshot','read','tabs','frames','frame','scroll','wait','diagnostics'].includes(args.action)){await this.policy.approve('나래 브라우저 · '+args.action,args,signal);if(['fill','press'].includes(args.action))await this.noCredentialInput(args);}

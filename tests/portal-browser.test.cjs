@@ -4,11 +4,21 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {login}=require('../src/portal-login.cjs');
 
+test('a document.write transition with no body is loading, with no actionable stale refs',async()=>{
+ const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();
+ try{await browser.start({headed:false});await browser.page.setContent('<button>이전 화면</button>');await browser.snapshot();await browser.page.evaluate(()=>document.body.remove());const loading=await browser.snapshot();assert.equal(loading.loading,true);assert.deepEqual(loading.elements,[]);assert.equal(browser.refs.size,0);await browser.page.setContent('<button>다음 화면</button>');const next=await browser.snapshot();assert.equal(next.elements[0].label,'다음 화면');}finally{await browser.browser?.close();}
+});
+
 test('observing a pending site alert returns its stable dialog instead of a repeated snapshot error',async()=>{
  const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();
  try{await browser.start({headed:false});await browser.context.route('https://portal.fixture/**',route=>route.fulfill({contentType:'text/html;charset=utf-8',body:'<title>안내 시험</title><button onclick="alert(\'합성 설치 상태 안내\')">상태 확인</button>'}));let screen=await browser.execute({action:'open',url:'https://portal.fixture/check'});screen=await browser.execute({action:'click',ref:screen.elements[0].ref});const id=screen.nativeDialog.id;
-  const repeated=await browser.execute({action:'snapshot'});assert.equal(repeated.nativeDialog.id,id);assert.equal(repeated.actionPending,true);const read=await browser.execute({action:'read'});assert.equal(read.nativeDialog.id,id);await browser.execute({action:'dialog',decision:'accept',expectedId:id,expectedMessage:'합성 설치 상태 안내'});
+  const repeated=await browser.execute({action:'snapshot'});assert.equal(repeated.nativeDialog.id,id);assert.equal(repeated.actionPending,true);const read=await browser.execute({action:'read'});assert.equal(read.nativeDialog.id,id);const diagnostics=await browser.execute({action:'diagnostics'});assert.equal(diagnostics.nativeDialog.id,id);await browser.execute({action:'dialog',decision:'accept',expectedId:id,expectedMessage:'합성 설치 상태 안내'});
  }finally{await browser.browser?.close();}
+});
+test('a startup alert in a new popup interrupts DOM waiting and returns to the same navigation after acknowledgment',async()=>{
+ const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();
+ try{await browser.start({headed:false});await browser.context.route('https://portal.fixture/**',route=>route.fulfill({contentType:'text/html;charset=utf-8',body:route.request().url().endsWith('/popup')?'<script>alert("합성 설치 안내")</script><title>새 업무 화면</title><button>메인페이지로 이동</button>':'<title>포털</title><button onclick="window.open(\'/popup\')">문서작성</button>'}));let screen=await browser.execute({action:'open',url:'https://portal.fixture/main'});screen=await browser.execute({action:'click',ref:screen.elements[0].ref});assert.equal(screen.nativeDialog.message,'합성 설치 안내');screen=await browser.execute({action:'dialog',decision:'accept',expectedId:screen.nativeDialog.id,expectedMessage:screen.nativeDialog.message});assert.equal(screen.title,'새 업무 화면');assert(screen.elements.some(e=>e.label==='메인페이지로 이동'));}
+ finally{await browser.browser?.close();}
 });
 
 test('local module access rejects unrelated, insecure, changed and attached origins',async()=>{
