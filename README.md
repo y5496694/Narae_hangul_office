@@ -137,6 +137,8 @@ npm start
 
 **나래AI 모델**에서 **설치 → 사용**으로 실제 학습한 모델을 선택합니다. AI 실행기는 설치.cmd에서 자동 준비하며, 모델은 Hugging Face에서 필요할 때 받습니다. 로컬 AI는 계정·API 키 없이 문서·통합 에이전트에 연결됩니다. 기존 나래교무 모델 가져오기와 Ollama·LM Studio 등 외부 로컬 서버 연결도 제공합니다.
 
+preview.26부터 각 모델의 **신뢰도** 버튼에서 이 PC의 실제 요청·응답·수행 결과를 확인합니다. 버튼 왼쪽은 근거를 확인한 업무 요청의 성공률이며, 가상·모의 시험은 제외하고 기록이 없으면 미집계로 표시합니다. [계산·기록 기준](docs/모델-신뢰도.md)을 참고하세요.
+
 - [나래1 · 0.6B](https://huggingface.co/inhow/Narae1-Qwen3-0.6B-SFT-v1)
 - [EXAONE 나래2 · 2.4B · 연구·평가용](https://huggingface.co/inhow/EXAONE-Narae2-2.4B-Tool-SFT-v2)
 - [나래3 · 4B](https://huggingface.co/inhow/Narae3-Qwen3-4B-LoRA-v1)

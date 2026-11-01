@@ -47,6 +47,7 @@ const {KakaoConnector}=require('./kakao-connector.cjs'),{RemotePolicy}=require('
 let remote,telegram,remoteSetupError='',activeAgentChannel='kakao',approvalChannel='kakao';
 const {LocalAI}=require('./local-ai.cjs');
 const localAI=new LocalAI({root,home,notify:emit});
+const modelReliability=new (require('./model-reliability.cjs').ModelReliability)({home,catalog:localAI.catalog});
 const requestAI=(config,body,signal)=>config.provider==='local'?localAI.request({settings:config,body,signal}):cloudRequest(config,body,signal);
 async function cloudRequest(config,body,signal){return provider.requestResponse({settings:config,credential:await credential(config),apiKey:config.connectionMode==='api'?keys[config.provider].get():undefined,signal,body});}
 const approvalView=approval=>approval?{...approval,channel:approvalChannel}:null;
@@ -103,6 +104,7 @@ const methods={
  state:()=>metadata(),configure,kakaoProgramState:()=>kakaoDesktop.status(),cronList:()=>scheduler.list(),cronSave:args=>scheduler.configure(args),cronRemove:({id})=>scheduler.remove(id),approvalState:()=>approvalView(remotePolicy.status()),
  windowState:()=>desktop?.state(),showWindow:({mode='full'})=>{desktop.show(mode);return desktop.state();},hideWindow:()=>window.hide(),
  localAIState:()=>localAI.status(),
+ modelReliabilityState:({id}={})=>id?modelReliability.status(id):modelReliability.summaries(),
  localAIDirectory:async()=>{idle();if(localAI.busy||localAI.child)throw new Error('실행 중인 AI를 먼저 중지하세요.');const picked=await dialog.showOpenDialog(window,{properties:['openDirectory','createDirectory'],title:'AI 모델 저장 폴더 선택',defaultPath:localAI.dir});return picked.canceled?localAI.status():localAI.configure({directory:picked.filePaths[0]});},
  localAIAutoStart:({enabled})=>localAI.setAutoStart(enabled===true),
  localAILicense:({id})=>{localAI.model(id);const names={narae1:'Qwen3-0.6B-LICENSE.txt',narae2:'EXAONE-3.5-LICENSE.txt',narae3:'Qwen3-4B-LICENSE.txt',narae4:'Narae4-LICENSE.txt'};return fs.readFileSync(path.join(root,'resources/model-licenses',names[id]),'utf8');},
