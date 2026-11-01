@@ -37,7 +37,7 @@ async function runAgent({prompt,context,settings,request,execute,send,signal,his
   if(signal.aborted)throw new Error('작업을 중지했습니다. 완료된 변경은 유지됩니다.');send({type:'status',text:turn?'결과를 확인하고 있습니다…':'AI에 요청하고 있습니다…'});
   let step=taskStep(task,input,availableTools);
   if(!step.context?.nativeDialog&&!step.receipt)step=wxsStep(prompt,input,step,task);
-  if(task?.area!=='draft-cycle'&&!step.context?.nativeDialog&&!step.receipt)step=documentStep(prompt,input,availableTools,settings.workspace,!task&&!/수정|편집|여러|각각|비교|요약|첨부|전송|보내/.test(prompt),context)||step;
+  if(!['draft-cycle','requisition'].includes(task?.area)&&!step.context?.nativeDialog&&!step.receipt)step=documentStep(prompt,input,availableTools,settings.workspace,!task&&!/수정|편집|여러|각각|비교|요약|첨부|전송|보내/.test(prompt),context)||step;
   if(!task&&!step.required&&!step.receipt)step=imageStep(prompt,input,availableTools,settings.workspace,context)||step;
   if(step.receipt){send({type:'text',text:step.receipt});return step.receipt;}
   if(settings.provider==='local'&&!step.required&&!step.tools.length&&(['cbe','edufine'].includes(task?.area)||step.evidenceReport)&&step.context?.documents){

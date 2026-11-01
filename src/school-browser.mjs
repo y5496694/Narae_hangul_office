@@ -29,6 +29,7 @@ function documentRowsDOM(){
 export class OfficeSchoolBrowser extends SchoolBrowser {
  constructor({profile,connection='isolated',connectionDirectory,endpoint,environment={}}={}){super();Object.assign(this,{profile,connection,connectionDirectory,endpoint,environment});this.closed=false;}
  resetTask(){this.launchAttempts=new Set();this.clickAttempts=new Map();}
+ clickIdentity(entry,label){this.clickPages||=new WeakMap();if(!this.clickPages.has(this.page))this.clickPages.set(this.page,randomUUID());return JSON.stringify({page:this.clickPages.get(this.page),frame:this.scope().url(),control:entry.id||[entry.role,entry.tag,label],label,dialog:this.lastObservation?.dialog,values:this.lastObservation?.elements?.filter(e=>Object.hasOwn(e,'value')).map(e=>[e.id||e.label,e.value])});}
  async diagnostics(){
   const current=await this.scope().evaluate(async()=>{
    const permissions={};for(const name of ['local-network-access','loopback-network','local-network'])try{permissions[name]=(await navigator.permissions.query({name})).state;}catch{permissions[name]='unsupported';}
@@ -150,7 +151,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
    if(regional.edufineHost(new URL(this.scope().url()).hostname)&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))await this.prepareExternalCapture(locator,entry);
    clickedLabel=label;
    if(/^(조회|검색)$/.test(label))queryNavigation=this.scope().waitForNavigation({waitUntil:'domcontentloaded',timeout:5000}).catch(()=>null);
-   if(!finalOperation(entry.label)){this.clickAttempts||=new Map();const signature=JSON.stringify({url:this.scope().url(),label,dialog:this.lastObservation?.dialog,values:this.lastObservation?.elements?.filter(e=>Object.hasOwn(e,'value')).map(e=>[e.label,e.value])}),attempts=this.clickAttempts.get(signature)||0;if(attempts>=3)throw new Fault('REPEATED_UI_ACTION','같은 화면·입력값에서 같은 버튼을 반복해 중지했습니다. 현재 탭을 유지하고 작업을 확인하세요.');this.clickAttempts.set(signature,attempts+1);}
+   if(!finalOperation(entry.label)){this.clickAttempts||=new Map();const signature=this.clickIdentity(entry,label),attempts=this.clickAttempts.get(signature)||0;if(attempts>=3)throw new Fault('REPEATED_UI_ACTION','같은 화면·입력값에서 같은 버튼을 반복해 중지했습니다. 현재 탭을 유지하고 작업을 확인하세요.');this.clickAttempts.set(signature,attempts+1);}
    if(label==='K-에듀파인'){this.launchAttempts||=new Set();const key=origin.url()+'\n'+label;if(this.launchAttempts.has(key))throw new Fault('REPEATED_SERVICE_LAUNCH','같은 요청에서 에듀파인 열기를 이미 시도했습니다. 열린 탭을 확인하고 메뉴를 다시 누르지 마세요.');this.launchAttempts.add(key);}
    if(entry.disabled)throw new Fault('DISABLED_ELEMENT','비활성 항목입니다. 현재 화면을 다시 확인하세요.');
    // The parent validates document-bound explicit authorization for final actions.
