@@ -4,6 +4,12 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {login}=require('../src/portal-login.cjs');
 
+test('observed Nexacro tree text navigates through DOM events while an ordinary approval button stays guarded',async()=>{
+ const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();
+ try{await browser.start({headed:false});await browser.page.setContent('<title>K-에듀파인</title><div class="StaticControl treeitemtext" style="width:160px;height:30px"><div class="nexacontentsbox" id="mainframe.LeftFrame.form.divLnb.form.gridMenu.body.gridrow_9.cell_9_0.celltreeitem.treeitemtext:text">결재</div></div><button>결재</button><p id="opened"></p><script>window.events=[];const item=document.querySelector(".nexacontentsbox");for(const type of ["mousedown","mouseup","click"])item.addEventListener(type,event=>{events.push([event.type,event.isTrusted]);if(type==="click")document.querySelector("#opened").textContent="결재 메뉴 열림";});</script>');let screen=await browser.snapshot({filter:'결재'});const menu=screen.elements.find(e=>e.nexacroMenu);assert.equal(menu.role,'treeitem');screen=await browser.execute({action:'click',ref:menu.ref});assert.equal(await browser.page.locator('#opened').innerText(),'결재 메뉴 열림');assert.deepEqual(await browser.page.evaluate(()=>events),[['mousedown',false],['mouseup',false],['click',false]]);const approval=screen.elements.find(e=>e.tag==='button'&&e.label==='결재');await assert.rejects(browser.execute({action:'click',ref:approval.ref}),/최종|명시|확인|승인/);}
+ finally{await browser.browser?.close();}
+});
+
 test('a document.write transition with no body is loading, with no actionable stale refs',async()=>{
  const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();
  try{await browser.start({headed:false});await browser.page.setContent('<button>이전 화면</button>');await browser.snapshot();await browser.page.evaluate(()=>document.body.remove());const loading=await browser.snapshot();assert.equal(loading.loading,true);assert.deepEqual(loading.elements,[]);assert.equal(browser.refs.size,0);await browser.page.setContent('<button>다음 화면</button>');const next=await browser.snapshot();assert.equal(next.elements[0].label,'다음 화면');}finally{await browser.browser?.close();}
