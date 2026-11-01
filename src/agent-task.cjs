@@ -15,7 +15,8 @@ function taskFor(prompt,history=[],now=new Date()){
  const cycle=cycleTask(prompt);if(cycle)return cycle;
  const query=queryTask(prompt);if(query)return query;
  const lifecycle=lifecycleTask(prompt);if(lifecycle)return lifecycle;
- if(/벤치|benchmark/i.test(prompt)&&!/훈련|학습|개발|개선|수정|실행|돌려/.test(prompt))return {area:'benchmark',observe:false};
+ const intent=prompt.replace(/"[^"]*"|“[^”]*”/g,'');
+ if(/벤치|benchmark/i.test(intent)&&!/훈련|학습|개발|개선|수정|실행|돌려/.test(intent))return {area:'benchmark',observe:false};
  if(/업무\s*포[털탈]/.test(prompt)&&/로그인/.test(prompt)&&/보안\s*문서|자동\s*로그인/.test(prompt)&&!/사용법|벤치|기능.*(?:개발|보완)/.test(prompt))return {area:'portal-login',observe:false,systems:[...(/나이스|NEIS/i.test(prompt)?['neis']:[]),...(/에듀파인/.test(prompt)?['edufine']:[])],instructions:'등록된 보안 문서로 자동 로그인을 한 번 시도한다. 암호·인증서 개인 값은 응답에 넣지 않는다. 최초 기기 접근 승인과 추가 보안 인증은 사용자에게 남긴다.'};
  if(/업무\s*포[털탈]|에듀파인|gyomu_portal_session/.test(prompt)&&/(?:세션(?:을|의)?\s*(?:시간(?:을)?\s*)?(?:자동\s*)?(?:연장|유지|상태|확인)|남은\s*시간|로그인(?:을)?\s*유지|gyomu_portal_session)/.test(prompt))return {area:'session',observe:false,operation:/연장|extend/.test(prompt)?'extend':'status',instructions:'기존 업무 창의 세션만 확인한다. 새 창이나 로그인을 만들지 않는다.'};
  const messenger=messengerTask(prompt,history,now);if(messenger)return messenger;

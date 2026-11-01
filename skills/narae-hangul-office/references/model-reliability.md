@@ -11,3 +11,5 @@ node <office-root>/scripts/import-model-reliability.cjs D:\Codex\evaluations\검
 한 요청의 도구 단계마다 성공을 늘리거나, 나중에 다른 AI가 수동으로 마친 결과를 원래 모델의 성공으로 바꾸지 않는다. 재시도는 독립 실행이 확인된 경우 한 건으로 기록한다. 응답 원문이 없으면 null, 도구 오류만 남았으면 `responseKind:'tool-error'`로 표시한다. 별도 학습 후보의 가중치 성과를 현재 배포 모델에 합산하지 않는다.
 
 원문 기록은 `<app-home>/data/model-reliability.json`에 있고 근거 파일은 사용자 PC에 남는다. 기록과 원문 근거는 Git·소스 ZIP·Hugging Face 공개 대상이 아니다. 앱 UI의 기록 새로고침으로 재검증한다.
+
+사용자가 삭제한 이전 기록은 `removedIds`로 재등록을 막는다. 새 벤치를 추가할 때 이 목록과 집계 기준 변경 사유를 보존하고, 삭제한 원본 묶음을 다시 가져오지 않는다.

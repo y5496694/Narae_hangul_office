@@ -4,7 +4,8 @@ const {pointer}=require('./office-benchmark.cjs');
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 class ModelReliability{
  constructor({home,catalog}){this.file=path.join(home,'data/model-reliability.json');this.catalog=catalog;}
- read(){if(!fs.existsSync(this.file))return [];const value=JSON.parse(fs.readFileSync(this.file,'utf8'));if(value.schema!==1||!Array.isArray(value.records)||value.records.length>2000)throw Error('실제 수행 기록 형식을 확인하세요.');return value.records;}
+ document(){if(!fs.existsSync(this.file))return {schema:1,records:[]};const value=JSON.parse(fs.readFileSync(this.file,'utf8'));if(value.schema!==1||!Array.isArray(value.records)||value.records.length>2000)throw Error('실제 수행 기록 형식을 확인하세요.');return value;}
+ read(){return this.document().records;}
  validate(record){
   const model=this.catalog.models.find(m=>m.id===record?.model);
   if(!model||typeof record.id!=='string'||!record.id||record.id.length>160||!['live-service','real-file'].includes(record.environment)||!['work','service-test'].includes(record.kind)||!['success','failure','partial','unverified','cancelled'].includes(record.outcome)||!Number.isFinite(Date.parse(record.at)))throw Error('모델·실제 환경·수행 결과를 확인하세요.');
@@ -43,9 +44,9 @@ class ModelReliability{
  summaries(){return this.catalog.models.map(m=>{const {records,...summary}=this.status(m.id);return summary;});}
  import(value){
   if(value?.schema!==1||!Array.isArray(value.records)||value.records.length>2000)throw Error('schema: 1 실제 수행 기록을 선택하세요.');
-  const records=this.read(),byId=new Map(records.map(r=>[r.id,r])),cache=new Map();
-  for(const record of value.records){this.validate(record);this.verify(record,cache);byId.set(record.id,record);}
-  const next={schema:1,records:[...byId.values()]};if(next.records.length>2000)throw Error('실제 수행 기록은 2,000건까지 보관합니다.');
+  const previous=this.document(),records=previous.records,removed=new Set(previous.removedIds||[]),byId=new Map(records.map(r=>[r.id,r])),cache=new Map();
+  for(const record of value.records){if(removed.has(record.id))throw Error('사용자가 삭제한 이전 수행 기록은 다시 등록하지 않습니다.');this.validate(record);this.verify(record,cache);byId.set(record.id,record);}
+  const next={...previous,schema:1,records:[...byId.values()]};if(next.records.length>2000)throw Error('실제 수행 기록은 2,000건까지 보관합니다.');
   fs.mkdirSync(path.dirname(this.file),{recursive:true});const temp=this.file+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(temp,JSON.stringify(next,null,2),{mode:0o600});fs.renameSync(temp,this.file);return this.summaries();
  }
 }
