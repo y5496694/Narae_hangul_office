@@ -87,7 +87,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
  async start({headed=false}={}){
   if(this.connection!=='isolated'){const result=await super.start({headed:true,connection:this.connection,endpoint:this.endpoint,directory:this.connectionDirectory,environment:this.environment});this.browser.on('disconnected',()=>{this.closed=true;});this.context.on('close',()=>{this.closed=true;});return result;}
   if(!this.profile){const result=await super.start({headed});this.context.on('close',()=>{this.closed=true;});return result;}
-  this.context=await chromium.launchPersistentContext(this.profile,{headless:!headed,chromiumSandbox:true,executablePath:browserPath(),args:['--hide-crash-restore-bubble','--restore-last-session'],viewport:{width:1280,height:900},locale:'ko-KR',acceptDownloads:false,serviceWorkers:'block'});
+  this.context=await chromium.launchPersistentContext(this.profile,{headless:!headed,chromiumSandbox:true,executablePath:browserPath(),args:['--hide-crash-restore-bubble','--restore-last-session'],viewport:{width:1280,height:900},locale:'ko-KR',acceptDownloads:true,serviceWorkers:'block'});
   this.context.on('close',()=>{this.closed=true;});
   this.browser={close:()=>this.context.close()};this.context.setDefaultTimeout(12000);
   const watch=p=>{if(this.pages.includes(p))return;this.pages.push(p);p.on('framenavigated',f=>{if(f===p.mainFrame()&&p===this.page)this.invalidate();});p.on('pageerror',e=>{this.errors.push(e.message.slice(0,200));this.errors=this.errors.slice(-10);});p.on('dialog',d=>d.dismiss().catch(()=>{}));};
@@ -124,6 +124,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
   this.lastObservation=result;return this.withFinalState({version,frameIndex:this.page.frames().indexOf(this.scope()),...result,untrusted:true});
  }
  async execute(command){
+  if(['requisition-observe','requisition-click','requisition-confirm','requisition-status'].includes(command.action))return super.execute(command);
   if(command.action==='dialog'){
    const prior=this.pendingUi,dialogPage=this.pendingDialog?.page;if(dialogPage&&dialogPage!==this.page){this.page=dialogPage;this.frame=null;this.invalidate();}const result=await this.executeObserved(command);if(prior){let timer;try{await Promise.race([prior,new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(new Fault('NAVIGATION_PENDING','안내를 닫은 뒤 원래 화면 전환이 끝나지 않았습니다. 같은 클릭을 반복하지 마세요.')),15000);})]);}finally{clearTimeout(timer);}if(this.pendingUi===prior)this.pendingUi=null;return this.snapshot(command);}return result;
   }

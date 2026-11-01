@@ -1,6 +1,6 @@
 # 나래4 CLI
 
-preview.23 학교회계 품의는 `gyomu_edufine_requisition`으로 목록·상세·예산 후보 조회, 작성안 검산과 빈 신규 화면 기본정보 입력을 처리한다. 일반 공문 기안과 구분한다. 예산 선택·품목 입력·첨부·저장·결재요청은 아직 지원하지 않는다. `gyomu_skill_read`의 `area:"edufine", document:"references/school-accounting.md"`로 공개 인자와 검증 범위를 읽는다. 화면 밖 행과 query의 서버 완료 시각은 미확인으로 남긴다.
+preview.24 학교회계 품의는 `gyomu_edufine_requisition`으로 목록·상세·예산 조회, 작성안 검산, 신규 등록·예산 선택·품목·첨부·저장을 처리한다. 저장 후 서버 재조회로 기본정보·예산·품목을 대조하고 첨부를 다시 내려받아 원본 해시를 검증한다. 명시한 경우 이 작업에서 저장한 시험 품의를 삭제하고 서버 조회의 빈 결과까지 확인한다. 결재요청·상신·임의 기존 품의 삭제는 미지원이다. `gyomu_skill_read`의 `area:"edufine", document:"references/school-accounting.md"`에서 표준 확인창, 실제 키 입력, 동작 기록·지문, 반복 방지와 검증 범위를 읽는다. 일반 WXS 공문 기안과 구분하고 가상 스크롤 밖 행은 미확인으로 남긴다. 이 변경은 기존 나래4 v1 가중치에 실행기를 보강한 것이며 새 가중치 학습이 아니다.
 
 preview.19부터 앱과 CLI의 저장 문서 도구는 같은 실행기를 사용한다. `read_document`의 `offset/limit`와 실제 `hasMore/nextOffset`으로 이어 읽고, `create_document`의 `title/text/blocks/page`로 제목·본문·표·그림·용지·여백을 지정한다. `notice`는 본문에 포함할 필수 안내문이다. 훈련용 요청의 실제 일정 아님 표시를 생략하지 않는다. `edit_document`의 `target`은 작업 폴더 안의 새 사본 경로이며 원본 수정에는 넣지 않는다. 비한글 저장 첨부는 `gyomu_wxs_attachment`로 형식별 읽기를 수행한다. 이 도구 연결을 Codex와 동일한 추론 능력이나 모든 기능의 실학교 검증으로 설명하지 않는다.
 

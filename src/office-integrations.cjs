@@ -65,13 +65,14 @@ class OfficeIntegrations{
   if(args.config?.body_hwp)args.config.body_hwp.path=register(args.config.body_hwp.path);
   if(args.config?.attachments)args.config.attachments=args.config.attachments.map(register);
   if(tool.original==='browser'){
+   if(args.action==='download'){args.path=this.policy.allowed(args.path);this.instance.downloadRoot=this.workspace();}
    if(args.action==='click'&&this.instance.browser){const b=this.instance.browser,{locator}=b.ref(args.ref);if(require('./school-region.cjs').edufineHost(new URL(b.scope().url()).hostname)&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))b.externalNativeBaseline=(await this.instance.wxs(['windows'],signal)).windows;}
    if(args.action==='open'){let url;try{url=new URL(args.url);}catch{throw new Error('웹 주소를 확인하세요.');}if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw new Error('HTTP(S) 웹 주소만 지원합니다.');}
-   if(['fill','press'].includes(args.action))await this.noCredentialInput(args);
-   if(!['snapshot','read','tabs','frames','frame','scroll','wait','diagnostics'].includes(args.action)){await this.policy.approve('나래 브라우저 · '+args.action,args,signal);if(['fill','press'].includes(args.action))await this.noCredentialInput(args);}
+   if(['fill','type','press'].includes(args.action))await this.noCredentialInput(args);
+   if(!['snapshot','read','tabs','frames','frame','scroll','wait','diagnostics'].includes(args.action)){await this.policy.approve('나래 브라우저 · '+args.action,args,signal);if(['fill','type','press'].includes(args.action))await this.noCredentialInput(args);}
   }
   if(tool.original==='portal.open'){await this.policy.approve('업무포털 열기',args,signal);await this.selectSchoolRegion();return this.browserCall({action:'open',url:portalLogin.config(this.home).portalUrl});}
-  if(tool.original==='edufine.requisition'&&args.operation==='fill')await this.policy.approve('신규 품의 기본정보 입력 · 저장·결재요청 없음',args,signal);
+  if(tool.original==='edufine.requisition'&&['prepare-input','fill','select-budget','enter-items','attach','save','delete','confirm'].includes(args.operation))await this.policy.approve('학교회계 품의 · '+args.operation,args,signal);
   if(tool.original==='wxs.read'&&['prepare','open'].includes(args.operation))this.instance.captures.directory=path.join(this.workspace(),'나래-공문조회');
   const result=await this.instance.call(tool.original,args,{signal});
   if(tool.original==='wxs.final.dialog'){const entry=this.wxsContinuationState.get(args.receipt_id)||{};entry.dialog=result;this.wxsContinuationState.set(args.receipt_id,entry);}
