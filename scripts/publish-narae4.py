@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / 'resources/local-models.json'
 RUNTIME_COMMIT = '6d732d5e3b69e8598014cf2904fb27ff112050d4'
+INSTALL_COMMIT = 'b9d03f5671c4821a24fd50b31d6452aec03f97ae'
 
 
 def sha(file):
@@ -172,8 +173,11 @@ Training scripts and synthetic dataset hashes are in the
 
 ## 사용 / Use
 
-For school workflows, use Narae Hangul Office preview.24 or a compatible later
-runtime. Select **나래4** in the local AI settings and install its verified files.
+For one-click installation of all four files, use Narae Hangul Office
+**preview.25 or later**. The [preview.25 application source](https://github.com/y5496694/Narae_hangul_office/tree/{INSTALL_COMMIT})
+includes the pinned download catalog. Select **나래4** in the local AI settings
+and install its verified files. New installations select Narae4 by default;
+existing explicit AI choices are preserved.
 The application verifies SHA256, the loaded model alias and the actual LoRA.
 Tool execution, Hangul/Windows integration and authenticated school UI access
 require the application and the user's own local setup; weights alone do not
