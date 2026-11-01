@@ -10,7 +10,7 @@ class ModelReliability{
   const model=this.catalog.models.find(m=>m.id===record?.model);
   if(!model||typeof record.id!=='string'||!record.id||record.id.length>160||!['live-service','real-file'].includes(record.environment)||!['work','service-test'].includes(record.kind)||!['success','failure','partial','unverified','cancelled'].includes(record.outcome)||!Number.isFinite(Date.parse(record.at)))throw Error('모델·실제 환경·수행 결과를 확인하세요.');
   for(const key of ['title','verification'])if(typeof record[key]!=='string'||!record[key].trim()||record[key].length>8000)throw Error('업무 제목과 결과 확인 근거가 필요합니다.');
-  for(const key of ['prompt','response'])if(record[key]!==null&&(typeof record[key]!=='string'||!record[key].trim()||record[key].length>50000))throw Error('요청·응답 원문 또는 null이 필요합니다.');
+  for(const [key,limit]of [['prompt',50000],['response',250000]])if(record[key]!==null&&(typeof record[key]!=='string'||!record[key].trim()||record[key].length>limit))throw Error('요청·응답 원문 또는 null이 필요합니다.');
   if(record.responseKind!==undefined&&!['assistant','tool-error','unavailable'].includes(record.responseKind))throw Error('응답 원문의 종류를 확인하세요.');
   if(!Array.isArray(record.proofs)||record.proofs.length>20)throw Error('원본 근거 목록이 필요합니다.');
   return model;
