@@ -24,8 +24,8 @@ function localCreationResult(prompt,settings,calls,name,output){
  return '문서 파일을 만들었습니다.\n'+output.path+'\n나래한글 엔진에서 저장한 내용을 다시 읽어 대조했습니다.';
 }
 async function runAgent({prompt,context,settings,request,execute,send,signal,history=[],additionalTools=[],agentInstructions=''}){
- const task=additionalTools.some(t=>t.name==='gyomu_browser')?taskFor(prompt,history):null;
- const documentOnly=!task&&(/\.(?:hwpx?|pdf|docx|xlsx?|pptx|csv|txt)$/i.test(context||'')||/한글|HWP|\.(?:hwpx?|pdf|docx|xlsx?|pptx|csv|txt|png|jpe?g|gif|webp)\b|read_image|그림|사진|이미지/i.test(prompt))&&!/브라우저|웹\s*(?:검색|탐색)|웹사이트|사이트\s*(?:열|접속)/.test(prompt);
+ const kakaoTask=additionalTools.some(t=>t.name==='gyomu_kakao')&&/카카오|카톡/.test(prompt);const regionalMessenger=additionalTools.some(t=>t.name==='gyomu_regional_messenger')&&/메신저|쪽지|교직원.*연락|대화방/.test(prompt);let task=additionalTools.some(t=>t.name==='gyomu_browser')?taskFor(prompt,history):null;if((regionalMessenger||kakaoTask)&&task?.area==='cbe')task=null;
+ const documentOnly=!task&&!regionalMessenger&&!kakaoTask&&(/\.(?:hwpx?|pdf|docx|xlsx?|pptx|csv|txt)$/i.test(context||'')||/한글|HWP|\.(?:hwpx?|pdf|docx|xlsx?|pptx|csv|txt|png|jpe?g|gif|webp)\b|read_image|그림|사진|이미지/i.test(prompt))&&!/브라우저|웹\s*(?:검색|탐색)|웹사이트|사이트\s*(?:열|접속)/.test(prompt);
  const availableTools=taskTools(task,[...tools,...additionalTools.filter(t=>!documentOnly||['gyomu_skill_read','gyomu_system_status','gyomu_wxs_attachment'].includes(t.name))]);
  const relevantHistory=['cbe','edufine','neis','portal'].includes(task?.area)&&!/^(계속|응|네|진행|다음|로그인.*완료|보내|사유)/.test(prompt.trim())?[]:history;
  const input=relevantHistory.slice(-12).filter(item=>['user','assistant'].includes(item.role)).map(item=>({role:item.role,content:item.content}));

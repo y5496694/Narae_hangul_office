@@ -62,3 +62,4 @@ test('dedicated Chrome uses observed certificate iframe, delayed SSO and real se
   assert.equal(submitted,1);
  }finally{await browser.browser?.close();}
 });
+test('a read failure after dispatch reobserves without repeating the original action',async()=>{const {OfficeSchoolBrowser}=await import('../src/school-browser.mjs'),browser=new OfficeSchoolBrowser();let actions=0,reads=0;browser.executeObserved=async()=>{actions++;throw Error('Execution context was destroyed');};browser.snapshot=async()=>{reads++;return {elements:[],text:'다음 화면'};};const result=await browser.execute({action:'click',ref:'observed'});assert.equal(actions,1);assert.equal(reads,1);assert.equal(result.originalActionRepeated,false);});

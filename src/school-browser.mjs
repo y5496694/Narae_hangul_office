@@ -4,6 +4,7 @@ import {bound,Fault,browserPath} from '../vendor/narae-gyomu/packages/narae_brow
 import {chromium} from 'playwright-core';
 import {randomUUID} from 'node:crypto';
 import session from './school-session.cjs';
+import regional from './school-region.cjs';
 function calendarChanged(expected){
  const popup=[...document.querySelectorAll('.cl-calendar.cl-popup')].find(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';});
  const state=JSON.stringify(popup?{text:popup.innerText,labels:[...popup.querySelectorAll('[aria-label]')].map(e=>e.getAttribute('aria-label'))}:null);
@@ -37,7 +38,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
  }
  captureExternalUri(raw,intent){let url;try{url=new URL(raw);}catch{return;}if(!intent||Date.now()-intent.at>15000||url.protocol!=='wxsclient:'||!/^\/open&url:[A-Za-z0-9+/%=]+&title:/.test(url.pathname))return;if(this.pendingExternalApp?.url===raw)return;this.pendingExternalApp={id:randomUUID(),scheme:'wxsclient',sourceOrigin:intent.sourceOrigin,formatTitle:intent.formatTitle,url:raw,launched:false,...(Array.isArray(intent.nativeBaseline)?{nativeBaseline:intent.nativeBaseline}:{})};}
  async prepareExternalCapture(locator,entry){
-  this.externalIntent={page:this.page,at:Date.now(),sourceOrigin:'https://klef.cbe.go.kr',formatTitle:entry.label.replace(/\s*새창열기$/,'').trim(),nativeBaseline:this.externalNativeBaseline};this.externalNativeBaseline=undefined;
+  this.externalIntent={page:this.page,at:Date.now(),sourceOrigin:new URL(this.scope().url()).origin,formatTitle:entry.label.replace(/\s*새창열기$/,'').trim(),nativeBaseline:this.externalNativeBaseline};this.externalNativeBaseline=undefined;
   this.externalBindings||=new WeakMap();let binding=this.externalBindings.get(this.page);if(!binding){binding='__naraeWxs_'+randomUUID().replaceAll('-','');const page=this.page;await page.exposeBinding(binding,(_source,raw)=>{const intent=this.externalIntent;if(intent?.page===page)this.captureExternalUri(raw,intent);});this.externalBindings.set(page,binding);}
   await this.scope().evaluate(binding=>{const record=value=>{if(typeof value==='string'&&/^wxsclient:/i.test(value))void window[binding](value);},scan=node=>{if(node.nodeType!==1)return;if(node.matches('iframe,frame'))record(node.getAttribute('src'));node.querySelectorAll?.('iframe,frame').forEach(e=>record(e.getAttribute('src')));};const observer=new MutationObserver(records=>{for(const r of records){if(r.type==='attributes'){record(r.oldValue);record(r.target.getAttribute('src'));}for(const node of r.addedNodes)scan(node);}});observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src'],attributeOldValue:true});setTimeout(()=>observer.disconnect(),15000);},binding);
  }
@@ -68,7 +69,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
   try{await locator.click({noWaitAfter:true});this.invalidate();const result=await this.snapshot(command);if(auth.dialog?.type==='confirm'&&!auth.dialog.accepted)this.finalAttempts.delete(key);return {...result,finalAction:{operation:'delete-recalled',attempted:true,completed:false,verificationRequired:true,...(auth.dialog?{nativeDialog:auth.dialog}:{})}};}finally{this.finalAuthorization=null;}
  }
  async lifecycleContext(){
-  const url=new URL(this.scope().url());if(url.origin!=='https://klef.cbe.go.kr'||!url.pathname.endsWith('/retrieveRtrvlScrin.do'))return null;
+  const url=new URL(this.scope().url());if(!regional.edufineHost(url.hostname)||!url.pathname.endsWith('/retrieveRtrvlScrin.do'))return null;
   const form=await this.scope().evaluate(()=>{const field=document.getElementById('opinion');return {label:field?.labels?.[0]?.innerText||'',text:document.body.innerText};}),operation=/삭제의견/.test(form.label)?'delete-recalled':/회수의견/.test(form.label)?'withdraw':null;if(!operation)return null;
   const opener=await this.page.opener();if(!opener||opener.isClosed()||new URL(opener.url()).origin!==url.origin)return null;
   const matches=[];for(const frame of opener.frames())if(/\/retrieveSanctnProgrsDocList\.do$/.test(new URL(frame.url()).pathname))for(const row of await frame.evaluate(documentRowsDOM))if(row.selected)matches.push({row,frame});
@@ -127,7 +128,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
   }
   if(this.pendingDialog)return {url:this.page.url(),nativeDialog:this.dialogState(),actionPending:true,dialog:null,text:'사이트 안내창 응답 대기',elements:[],untrusted:true};
   let wake;const notice=new Promise(resolve=>{wake=()=>resolve({notice:true});});this.dialogWaiters||=new Set();this.dialogWaiters.add(wake);
-  const work=this.executeObserved(command);try{const result=await Promise.race([work.then(value=>({value})),notice]);if(result.notice){this.pendingUi=work.catch(error=>({error:error.message}));return {url:this.page.url(),nativeDialog:this.dialogState(),actionPending:true,dialog:null,text:'사이트 안내창 응답 대기',elements:[],untrusted:true};}return result.value;}finally{this.dialogWaiters.delete(wake);}
+  const work=this.executeObserved(command).catch(async error=>{if(!/Execution context was destroyed|Cannot read properties of null/.test(error.message))throw error;for(let attempt=0;attempt<4;attempt++){await new Promise(resolve=>setTimeout(resolve,200));try{return {...await this.snapshot(command),observedAfterTransition:true,originalActionRepeated:false};}catch(next){if(!/Execution context was destroyed|Cannot read properties of null/.test(next.message))throw next;}}throw error;});try{const result=await Promise.race([work.then(value=>({value})),notice]);if(result.notice){this.pendingUi=work.catch(error=>({error:error.message}));return {url:this.page.url(),nativeDialog:this.dialogState(),actionPending:true,dialog:null,text:'사이트 안내창 응답 대기',elements:[],untrusted:true};}return result.value;}finally{this.dialogWaiters.delete(wake);}
  }
  async executeObserved(command){
   this.watchExternalApps();
@@ -139,13 +140,13 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
    await this.context.grantPermissions(['local-network-access'],{origin:url.origin});return {...await this.diagnostics(),permissionGranted:true,refreshed:false};
   }
   if(this.attached&&(!this.page||this.page.isClosed())&&['snapshot','read','frames'].includes(command.action))return this.snapshot(command);
-  if(command.action==='open'&&new URL(command.url).hostname==='cbe.eduptl.kr'){const requested=new URL(command.url).href,existing=this.context.pages().find(p=>!p.isClosed()&&p.url()===requested);if(existing){this.page=existing;this.frame=null;await existing.bringToFront();this.invalidate();return this.snapshot(command);}}
+  if(command.action==='open'&&regional.portalHost(new URL(command.url).hostname)){const requested=new URL(command.url).href,existing=this.context.pages().find(p=>!p.isClosed()&&p.url()===requested);if(existing){this.page=existing;this.frame=null;await existing.bringToFront();this.invalidate();return this.snapshot(command);}}
   if(command.action==='frame'){const target=this.page.frames()[command.index];if(target&&/websocket|webReport|내용없음/i.test(target.name()))throw new Fault('UTILITY_FRAME','웹소켓·리포트 보조 프레임입니다. 업무 메뉴가 있는 최상위 frame 0을 사용하세요.');}
   const calendarBefore=command.action==='click'&&this.lastObservation?.dialog==='달력'?await this.scope().evaluate(calendarChanged):undefined;
   const origin=this.page,popup=command.action==='click'?this.context.waitForEvent('page',{timeout:1500}).catch(()=>null):null;let clickedLabel,queryNavigation;const commitDate=command.action==='fill'&&/등록일자|신청일자|시작일자|종료일자/.test(this.ref(command.ref).entry.label);
   if(command.action==='click'){
    const {entry,locator}=this.ref(command.ref),label=entry.label.replace(/\s+/g,'');
-   if(new URL(this.scope().url()).origin==='https://klef.cbe.go.kr'&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))await this.prepareExternalCapture(locator,entry);
+   if(regional.edufineHost(new URL(this.scope().url()).hostname)&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))await this.prepareExternalCapture(locator,entry);
    clickedLabel=label;
    if(/^(조회|검색)$/.test(label))queryNavigation=this.scope().waitForNavigation({waitUntil:'domcontentloaded',timeout:5000}).catch(()=>null);
    if(!finalOperation(entry.label)){this.clickAttempts||=new Map();const signature=JSON.stringify({url:this.scope().url(),label,dialog:this.lastObservation?.dialog,values:this.lastObservation?.elements?.filter(e=>Object.hasOwn(e,'value')).map(e=>[e.label,e.value])}),attempts=this.clickAttempts.get(signature)||0;if(attempts>=3)throw new Fault('REPEATED_UI_ACTION','같은 화면·입력값에서 같은 버튼을 반복해 중지했습니다. 현재 탭을 유지하고 작업을 확인하세요.');this.clickAttempts.set(signature,attempts+1);}

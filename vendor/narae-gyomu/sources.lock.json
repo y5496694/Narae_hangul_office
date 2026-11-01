@@ -493,7 +493,7 @@
     {
       "name": "narae_gyomoo_portal",
       "repository": "https://github.com/y5496694/narae_gyomoo_portal",
-      "commit": "ba64806c1225f43f7c9d73e7f375d2d974ed95b0",
+      "commit": "83ba8d9a87dbaa6457a37ea5470df3f4a410edcc",
       "files": {
         ".gitattributes": "c4d8df0f5314d4a4be874ce7a929543f353d5ae841174fae175ef31ecf9c5d50",
         ".github/workflows/final-actions.yml": "b69a8fe6120e13474881d501df2ad02bb8b8518cf3ada2b507e50b1e42d4ff0d",
@@ -523,7 +523,7 @@
         "skills/narae-gyomu-work-portal/references/portal.json": "f1e66e41e0df414c6abebc8388e209ed6513e7c70a4e135c3699f6466b34cf17",
         "skills/narae-gyomu-work-portal/references/regions.md": "dd594e7153662c6d246ff0ab13a98bdcf4eabfb172a79f638463bc6758f05088",
         "skills/narae-gyomu-work-portal/scripts/certificate-profile.ps1": "60f2642ae6f6cfddc139b509707637b7dac17fc6a3d9925416a85d56e9f7ec2c",
-        "skills/narae-gyomu-work-portal/scripts/portal-login.cjs": "786b1748a5e3c6f6fafd74573d69adbadb6009791b15c0fb93359ab873ff531c",
+        "skills/narae-gyomu-work-portal/scripts/portal-login.cjs": "e75abbb1b0ecd4b856b1bab915e6f7be9638bd4fad45a7e3af8c58cb8862f293",
         "skills/narae-gyomu-work-portal/scripts/regions.cjs": "cdb708392740ae2ed6fed75acd5f866b25292772b22d7d626a008903baae5164",
         "skills/narae-gyomu-work-portal/SKILL.md": "d08aba20081d92049a5b23a634b5fdc17c051e96fae6c415063377ab182bff69",
         "skills/wxs-cli/agents/openai.yaml": "bc6cb38ddb9551325b68238ab76cc2905a08f1964fc238243d5b5e05e3975f58",
@@ -545,7 +545,7 @@
         "skills/wxs-cli/scripts/wxs_absence.py": "1e97f7cd51a81377d1d7398f9a8b228b6e964cf67de6a59f79089af51f32eb17",
         "skills/wxs-cli/scripts/wxs_actions.js": "62e8ce5493eeb8135dea6e64af55fc7afeff2dca0f817bcc574a97fcdbdbc6a9",
         "skills/wxs-cli/scripts/wxs_attachments.py": "234d17c0e2bd69ca6d0f8d2fe69ab84a90931ac4fbbadc2968b9a469f5091314",
-        "skills/wxs-cli/scripts/wxs_cli.py": "cfa384283cf40b0949a3fb7a8a15d7ffa4d6511f3f85bf0bcf6cf409e796fe6e",
+        "skills/wxs-cli/scripts/wxs_cli.py": "27bf7901a6a06abe63ac4efbf91d31f7ab5b450dfaa87c7819084cf61daab7fc",
         "skills/wxs-cli/scripts/wxs_config.py": "946841ad863ddf56739fe2e1a5d879c6ba2ea05df1bd009dfe899ef821749152",
         "skills/wxs-cli/scripts/wxs_document.py": "ef5ba34a47101c22fd193eeef192bda3317fea8a59fffb2b4b8f22ecc9a459ba",
         "skills/wxs-cli/scripts/wxs_final.py": "cc4418397d23074df96f6f1ec85ce68f64af20adaf54c71873719776a529d05f",
@@ -554,9 +554,9 @@
         "skills/wxs-cli/scripts/wxs_read.py": "4e64430ddf65547c8144f446b62c2c018c4f0759f81ce51151814752f3471a24",
         "skills/wxs-cli/scripts/wxs_route_notice.py": "f9118ea6051bfa2c0f167f4f73b9a86c323a1ac6e61b45c13064e9546a04ee2b",
         "skills/wxs-cli/scripts/wxs_runtime.py": "21d87b98d5f70fe8ed099a140817a7977ead713b9202d378214b9fd02505b4fe",
-        "skills/wxs-cli/scripts/wxs_startup.py": "d701f00df0dc508f2e47ad2d0dd4772d388a54d2f69abc805b1b6c1ab8adb71b",
+        "skills/wxs-cli/scripts/wxs_startup.py": "fa2106aa0c8d4db8d25906129fb2c5697947875d23bbff4ff90b1c29cbea109d",
         "skills/wxs-cli/SKILL.md": "7c4c8e9bc336ed06e268684fef49be7cbcb4c000993df9f102c778c8bdbca640",
-        "tests/portal-login.test.cjs": "3bd61441b5e80ff0cb59f851c98d04c0b7b709ca3ad0266d2d2ad0005625d595",
+        "tests/portal-login.test.cjs": "845fbf1d290bfe335c3ebfd3a8580af6d99b08970d2ab6e4573460d71774f9b0",
         "tests/regions.test.cjs": "c8ea7a7f904cd1a2bde937618002e9d541af0c2e2755ec4aecd36d71780ff086",
         "tests/test_absence.py": "986da32c160ed4d7bee94159bbf6b1f7f1bb79f241f1a0252f626ff8f296f784",
         "tests/test_actions.cjs": "94973881d286adf54e99b165585a82e1c4021533bff35a161888edfba2405300",
@@ -571,7 +571,7 @@
         "tests/test_read.py": "b683bbae76f854eb41f4072d7094a37e731726b891487fd1b654c4103a14ca99",
         "tests/test_route_notice.py": "67746bd66ff4065644f3e09d79bad54503909c38158650e667e65976aa18129b",
         "tests/test_runtime.py": "4b80393b0a861c02181248afac36b3acec60c7aff789181e09916437a9e9df35",
-        "tests/test_startup.py": "8503a7efa7f94608207de4b992f95d55a4117b2a38c64297216fc0523716729b",
+        "tests/test_startup.py": "ce0032628a0f0ea3e5ff2c5d295428a1e07d414e661bf545c2baa4f4da69fea2",
         "validate.ps1": "0096f1835cd5828371185e572d92fa04b2173c64d19f35d2df72baea76f9d204"
       }
     }

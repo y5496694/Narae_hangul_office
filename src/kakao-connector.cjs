@@ -2,14 +2,15 @@
 const fs=require('node:fs'),path=require('node:path');
 function relayOrigin(value,allowLoopback=false){let u;try{u=new URL(value);}catch{throw new Error('중계 서버 HTTPS 주소를 입력하세요.');}const loopback=['127.0.0.1','localhost','[::1]'].includes(u.hostname);if((u.protocol!=='https:'&&!(allowLoopback&&loopback&&u.protocol==='http:'))||u.username||u.password||u.search||u.hash||!/^\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]*$/.test(u.pathname))throw new Error('중계 서버의 HTTPS 기본 주소와 경로만 입력하세요.');return u.origin+u.pathname.replace(/\/$/,'');}
 class KakaoConnector{
- constructor({store,ledgerFile,execute,notify=()=>{},fetchImpl=fetch,allowLoopback=false,interval=2000,canRun=()=>true,conversation=()=>null}){
+ constructor({store,ledgerFile,execute,notify=()=>{},fetchImpl=fetch,allowLoopback=false,interval=2000,canRun=()=>true,conversation=()=>null,schedules=()=>null,deliverOutput}){
+  this.schedules=schedules;this.deliverOutput=deliverOutput;this.scheduleRevision=null;
   this.canRun=canRun;this.conversation=conversation;this.synced=new Map();
   this.store=store;this.ledgerFile=ledgerFile;this.execute=execute;this.notify=notify;this.fetch=fetchImpl;this.allowLoopback=allowLoopback;this.interval=interval;this.busy=false;this.polling=false;this.closed=false;this.progress='';this.approval=null;
   const raw=store.get();this.credentials=raw?JSON.parse(raw):null;this.state=this.credentials?.state||'disconnected';this.error='';this.ledger={};
   if(ledgerFile&&fs.existsSync(ledgerFile))this.ledger=JSON.parse(fs.readFileSync(ledgerFile,'utf8'));
   for(const item of Object.values(this.ledger))if(item.state==='running')item.state='unknown';this.saveLedger();
  }
- saveLedger(){if(!this.ledgerFile)return;fs.mkdirSync(path.dirname(this.ledgerFile),{recursive:true});const tmp=this.ledgerFile+'.tmp';fs.writeFileSync(tmp,JSON.stringify(this.ledger),{mode:0o600});fs.renameSync(tmp,this.ledgerFile);}
+ saveLedger(){if(!this.ledgerFile)return;fs.mkdirSync(path.dirname(this.ledgerFile),{recursive:true});const tmp=this.ledgerFile+'.tmp';fs.writeFileSync(tmp,JSON.stringify(this.ledger),{mode:0o600});require('./agent-conversations.cjs').replaceFile(tmp,this.ledgerFile);}
  persist(){if(this.credentials)this.store.set(JSON.stringify(this.credentials));else this.store.remove();}
  status(){const c=this.credentials;return {state:this.state,uid:c?.uid||'',name:c?.name||'',relay:c?.relay||'',code:['pending','confirmed'].includes(this.state)?c?.code||'':'',expires:c?.expires||0,busy:this.busy,error:this.error,progress:this.progress,approval:this.approval};}
  changed(){this.notify({type:'remote',remote:this.status()});}
@@ -23,7 +24,7 @@ class KakaoConnector{
  async tick(){if(this.closed||this.polling||!this.credentials?.token)return;const c=this.credentials;this.polling=true;try{
   if(this.state!=='approved'){await this.refresh();return;}
   if(this.busy){const result=await this.api('/v1/device/heartbeat',{jobId:this.job.id,lease:this.job.lease,progress:this.progress});if(result.cancelRequested)this.controller?.abort();return;}
-  await this.syncConversation();if(this.credentials!==c||this.closed||!this.canRun())return;
+  await this.syncConversation();const schedules=this.schedules(),revision=schedules?c.id+':'+schedules.revision:null;if(schedules&&this.scheduleRevision!==revision){await this.api('/v1/device/schedules',schedules,c);this.scheduleRevision=revision;}if(this.credentials!==c||this.closed||!this.canRun())return;
   const {job}=await this.api('/v1/device/poll',{},c);if(this.credentials!==c||this.closed)return;this.error='';if(job){this.busy=true;this.job=job;this.controller=new AbortController();this.changed();void this.run(job,c).catch(()=>{this.error='로컬 작업 기록을 확인해 주세요. 자동 재실행하지 않았습니다.';this.changed();});}
  }catch(error){if(this.credentials!==c||this.closed)return;this.error=error.status===401?'연결이 해제됐어. 다시 연결해 줘.':'중계 서버 연결을 확인해 주세요.';if(this.busy)this.controller?.abort();if(error.status===401){this.state='revoked';this.credentials=null;this.store.remove();}this.changed();}finally{this.polling=false;}}
  async run(job,c){let result;try{
@@ -31,6 +32,7 @@ class KakaoConnector{
   if(Object.keys(this.ledger).length>=10000)throw new Error('LOCAL_JOB_CAPACITY');this.ledger[job.id]={state:'running',started:Date.now()};this.saveLedger();
   const output=await this.execute(job.prompt,{signal:this.controller.signal,uid:c.uid,sessionId:c.id,progress:text=>{this.progress=String(text).slice(0,150);this.changed();}});
   result={state:this.controller.signal.aborted?'cancelled':'completed',output:String(output||'작업을 마쳤어.')};
+  if(result.state==='completed'&&this.deliverOutput){try{const delivery=await this.deliverOutput(result.output,{id:'kakao:'+job.id,title:'나래 에이전트 결과'});result.output='결과를 나와의 채팅에 제출했어. PC 카카오톡에서 확인해 줘. ('+delivery.state+')';this.ledger[job.id].delivery=delivery;}catch(error){result.output='PC 작업은 완료했지만 나와의 채팅 전송은 확인하지 못했어. PC의 에이전트 대화에서 결과를 확인해 줘. 자동 재실행·재전송하지 않았어.';this.error='카카오톡 CLI의 나와의 채팅 연결을 확인해 주세요.';}}
  }catch(error){result={state:this.controller?.signal.aborted?'cancelled':'failed',output:'',error:error.code==='LOCAL_APPROVAL_DENIED'?'LOCAL_APPROVAL_DENIED':'REMOTE_FAILURE'};}
  try{if(this.credentials?.id!==c.id)throw new Error('UNLINKED');await this.api('/v1/device/result',{jobId:job.id,lease:job.lease,...result},c);this.ledger[job.id]={...this.ledger[job.id],state:result.state,finished:Date.now()};}catch{this.ledger[job.id]={...this.ledger[job.id],state:'unknown',finished:Date.now()};this.error='결과 전송을 확인하지 못했어. 작업을 자동 재실행하지 않았어.';}finally{this.saveLedger();this.busy=false;this.job=null;this.controller=null;this.progress='';this.changed();}}
  close(){this.closed=true;clearInterval(this.timer);this.timer=null;this.controller?.abort();}

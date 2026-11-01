@@ -9,7 +9,7 @@ function privateCLI({root,python,env,request,apply,fingerprint,signal}){
  });
 }
 async function execute(args,{root,python,instance,signal,run=privateCLI}){
- const browser=instance.browser,entry=browser?.pendingExternalApp;if(!entry||entry.id!==args.id||browser.attached||entry.sourceOrigin!=='https://klef.cbe.go.kr'||entry.scheme!=='wxsclient')throw Error('현재 공용서식 클릭에서 관찰한 WXS 실행 ID가 필요합니다.');
+ const browser=instance.browser,entry=browser?.pendingExternalApp;if(!entry||entry.id!==args.id||browser.attached||!require('./school-region.cjs').edufineHost(new URL(entry.sourceOrigin).hostname)||entry.scheme!=='wxsclient')throw Error('현재 공용서식 클릭에서 관찰한 WXS 실행 ID가 필요합니다.');
  if(entry.attempted)throw Error('이 WXS 실행 요청은 이미 시도했습니다. 열린 창을 확인하고 반복하지 마세요.');
  if(args.operation==='apply'&&(!entry.preview?.ready||args.fingerprint!==entry.preview.fingerprint))throw Error('직전 WXS 실행 미리보기와 같은 지문이 필요합니다.');
  if(args.operation==='apply'){
