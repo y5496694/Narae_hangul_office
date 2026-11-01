@@ -6,6 +6,7 @@ const id=()=>randomBytes(16).toString('hex'),hash=s=>createHash('sha256').update
 const equal=(a,b)=>{if(typeof a!=='string'||typeof b!=='string')return false;const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length&&timingSafeEqual(aa,bb);};
 const terminal=new Set(['completed','failed','cancelled','unknown']);
 function pagesOf(text){const pages=[];let page='';for(const char of text){if(page.length+char.length>880){pages.push(page);page='';}page+=char;}pages.push(page);return pages;}
+function schedulePages(jobs){const pages=[];let page='';for(const j of jobs){const block=`${j.enabled?'켜짐':'꺼짐'} · ${j.name}\n${j.expression} · ${j.timeZone}\n최근: ${j.last?.state||'실행 전'}`;if(page&&page.length+block.length+2>850){pages.push(page);page='';}page+=(page?'\n\n':'')+block;}pages.push(page||'등록된 예약 작업이 없어.');return pages;}
 const textReply=(text,buttons=[])=>({version:'2.0',template:{outputs:[{simpleText:{text:text.slice(0,1000)}}],quickReplies:buttons.map(([label,messageText])=>({label,action:'message',messageText}))}});
 function fail(status,code){const error=new Error(code);error.status=status;throw error;}
 class KakaoRelay{
@@ -52,9 +53,9 @@ class KakaoRelay{
   }
   const d=Object.values(this.data.devices).find(d=>d.uid===u.uid&&d.state==='approved');
   if(t==='연결 해제'){for(const dev of Object.values(this.data.devices))if(dev.uid===u.uid&&!['revoked','expired'].includes(dev.state))this.revoke(dev);return textReply('이 카톡의 PC 원격 연결을 해제했어. UID는 유지돼.');}
-  if(t==='연결 상태')return textReply(d?`연결 PC: ${d.name}\n${this.clock()-d.lastSeen<30000?'온라인':'오프라인 · PC와 나래 오피스를 켜 줘.'}`:'아직 승인된 PC가 없어.\n나래 UID: '+u.uid);
+  if(t==='연결 상태')return textReply(d?`연결 PC: ${d.name}\n${this.clock()-d.lastSeen<30000?'온라인':'오프라인 · PC와 나래 오피스를 켜 줘.'}`:'아직 승인된 PC가 없어.\n나래 UID: '+u.uid,d?[['예약 목록','cron'],['최근 대화','대화 확인']]:[]);
   if(['cron','/cron','cron 조회','예약 조회','예약 목록'].includes(t)||/^(?:cron|\/cron) \d+$/.test(t)){
-   if(!d)return textReply('승인된 PC를 먼저 연결해 줘.');const schedules=d.schedules;if(!schedules)return textReply('아직 PC의 예약 작업 목록이 동기화되지 않았어. 나래 오피스를 실행해 줘.');const page=Math.max(1,Math.min(5,Number(t.split(' ')[1])||1)),lines=schedules.jobs.slice((page-1)*10,page*10).map(j=>`${j.enabled?'켜짐':'꺼짐'} · ${j.name}\n${j.expression} · ${j.timeZone}\n최근: ${j.last?.state||'실행 전'}`);return textReply('예약 작업 '+schedules.jobs.length+'개 · '+page+'페이지\n'+(this.clock()-d.lastSeen>=30000?'PC 오프라인 · 마지막 동기화 목록\n':'')+(lines.join('\n\n')||'이 페이지에 등록된 예약 작업이 없어.'),page*10<schedules.jobs.length?[['다음 예약','cron '+(page+1)]]:[]);
+   if(!d)return textReply('승인된 PC를 먼저 연결해 줘.');const schedules=d.schedules;if(!schedules)return textReply('아직 PC의 예약 작업 목록이 동기화되지 않았어. 나래 오피스를 실행해 줘.');const pages=schedulePages(schedules.jobs),page=Math.max(1,Math.min(pages.length,Number(t.split(' ')[1])||1));return textReply('예약 작업 '+schedules.jobs.length+'개 · '+page+'/'+pages.length+'페이지\n'+(this.clock()-d.lastSeen>=30000?'PC 오프라인 · 마지막 동기화 목록\n':'')+pages[page-1],[...(page>1?[['이전 예약','cron '+(page-1)]]:[]),...(page<pages.length?[['다음 예약','cron '+(page+1)]]:[]),['연결 상태','연결 상태']]);
   }
   if(t==='대화 확인'||t==='최근 대화'||/^대화 \d+$/.test(t)){
    if(!d)return textReply('승인된 PC를 먼저 연결해 줘.');const messages=d.conversation?.messages||[];if(!messages.length)return textReply('공유된 에이전트 대화가 없어. PC의 에이전트(실험) 탭에서 시작해 줘.');
