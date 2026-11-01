@@ -61,7 +61,8 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
    // The parent validates document-bound explicit authorization for final actions.
    if(label==='승인요청'){
     const context=await locator.evaluate(e=>{const root=e.closest('[role=dialog],dialog')||document.body;return (root.getAttribute('aria-label')||'')+' '+root.innerText;});
-    if(!/근무상황신청/.test(context))throw new Fault('UNSUPPORTED_FINAL_ACTION','근무상황신청 준비창의 승인요청인지 확인되지 않았습니다.');
+    const trip=/출장신청/.test(context)&&/출장지/.test(context)&&/출장목적/.test(context);
+    if(!/근무상황신청/.test(context)&&!trip)throw new Fault('UNSUPPORTED_FINAL_ACTION','근무상황신청 또는 출장신청 준비창의 승인요청인지 확인되지 않았습니다.');
    }
   }
   if(command.action==='select'&&this.ref(command.ref).entry.tag!=='select')throw new Fault('CUSTOM_COMBOBOX','HTML select가 아닙니다. combobox를 click한 뒤 실제 option ref를 click하세요.');

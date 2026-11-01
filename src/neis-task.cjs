@@ -24,7 +24,19 @@ function neisStep(task,input,all){
  const missing=duty?Object.entries({대상:p.person,날짜:p.date}).filter(([,v])=>!v).map(([k])=>k):Object.entries({시작일:p.date,종료일:p.endDate,시작시각:p.start,종료시각:p.end,출장지:p.destination,출장목적:p.purpose}).filter(([,v])=>!v).map(([k])=>k);
  if(missing.length)return done('요청한 '+(duty?'복무 조회':'출장 신청')+'에 필요한 '+missing.join(', ')+'가 없습니다. 실제 값이 필요합니다. 값을 임의로 입력하지 않았습니다.');
  const find=re=>els.filter(e=>!e.disabled&&re.test(fields(e)));
- const set=(patterns)=>{for(const [re,value]of patterns){if(!value)continue;const candidates=find(re).filter(e=>['input','textarea','select'].includes(e.tag)||e.role==='combobox');if(candidates.length>1)return done('같은 이름의 입력란이 여러 개라 '+re+' 필드를 구분할 수 없습니다.');const e=candidates[0];if(!e||eq(e.value??e.display,value))continue;if(e.dateInput?.className?.split(/\s+/).includes('cl-text'))return done('현재 날짜는 마스크 달력 입력입니다. 이 출장·타인 조회 화면의 달력 경로 검증이 필요합니다.');if(e.tag==='select'){const option=e.options?.filter(o=>eq(o.text,value)||eq(o.value,value));if(option?.length!==1)return done('현재 선택지에서 요청한 '+value+' 값을 유일하게 확인하지 못했습니다.');return step('select',{ref:e.ref,value:option[0].value},'현재 실제 선택지와 요청 값을 대조해 선택한다.');}if(e.role==='combobox')return step('click',{ref:e.ref},'현재 실제 선택 목록을 연다.');return step('fill',{ref:e.ref,text:value},'사용자가 지정한 '+e.label+' 값만 입력한다.');}return null;};
+ if(screen.dialog==='달력'&&task._calendarDate){const parts=task._calendarDate.split('-').map(Number),day=els.find(e=>{const m=e.label?.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);return !e.disabled&&m&&m.slice(1).every((v,i)=>Number(v)===parts[i]);}),header=els.find(e=>/^\d{4}\s+\d{1,2}월$/.test(e.label?.trim())),shown=header?.label.match(/(\d{4})\s+(\d{1,2})월/),delta=shown?(parts[0]-Number(shown[1]))*12+parts[1]-Number(shown[2]):0,move=delta&&els.find(e=>!e.disabled&&e.label.replace(/\s/g,'')===(delta>0?'다음달':'이전달'));if(day||move)return step('click',{ref:(day||move).ref},'관찰한 달력에서 요청한 날짜 '+task._calendarDate+'를 선택한다.');return done('열린 달력에서 요청한 날짜로 이동할 실제 경로를 확인하지 못했습니다.');}
+ const tripPatterns=[[/^(?:출장시작일자|시작일자|신청기간시작일자)$/,p.date],[/^(?:출장종료일자|종료일자|신청기간종료일자)$/,p.endDate],[/^(?:시작시각|시작시간)$/,p.start],[/^(?:종료시각|종료시간)$/,p.end],[/^(?:출장지|목적지)$/,p.destination],[/^(?:출장목적|목적|용무|사유)$/,p.purpose],[/^교통수단$/,p.transport],[/^(?:여비|여비지급구분)$/,p.cost],[/^(?:출장구분|출장종류)$/,p.type]];
+ const tripVerified=value=>tripPatterns.every(([re,v])=>v&&(value.elements||[]).some(e=>re.test(fields(e))&&eq(e.value??e.display,v)));
+ if(!duty&&task.submit&&/기안문서상신|개인\s*결재선/.test(screen.dialog||'')){
+  const source=observations.findLast(r=>tripVerified(r.value));if(!source)return done('출장의 유형·기간·시각·목적지·목적·교통·여비를 입력 화면에서 확인한 근거가 없습니다.');
+  const route=require('./neis-approval.cjs').approvalRoute(screen);
+  if(/개인\s*결재선/.test(screen.dialog)){const buttons=find(/^지정$/);if(route&&buttons.length===1)return step('click',{ref:buttons[0].ref},'현재 관찰한 개인결재선의 이름·역할·순서를 적용한다.');const options=find(/출장/).filter(e=>e.role==='option');if(options.length===1)return step('click',{ref:options[0].ref},'현재 관찰한 유일한 출장 개인결재선을 선택하고 실제 구성원을 다시 확인한다.');return done('현재 개인결재선의 구성원·역할·순서를 유일하게 확인하지 못했습니다.');}
+  const applied=rows.some((r,i)=>r.name==='gyomu_browser'&&r.args.action==='click'&&!r.value.error&&rows.slice(0,i).findLast(x=>x.value.elements)?.value.elements.some(e=>e.ref===r.args.ref&&fields(e)==='지정'));
+  if(applied&&route)return {tools:[],readyForFinal:true};
+  const choose=find(/^개인결재선$/);if(choose.length===1)return step('click',{ref:choose[0].ref},'현재 출장의 개인결재선을 실제로 열어 확인한다.');
+  return done('출장의 현재 결재선 적용을 확인하지 못했습니다.');
+ }
+ const set=(patterns)=>{for(const [re,value]of patterns){if(!value)continue;const candidates=find(re).filter(e=>['input','textarea','select'].includes(e.tag)||e.role==='combobox');if(candidates.length>1)return done('같은 이름의 입력란이 여러 개라 '+re+' 필드를 구분할 수 없습니다.');const e=candidates[0];if(!e||eq(e.value??e.display,value))continue;if(e.dateInput?.className?.split(/\s+/).includes('cl-text')){const next=els[els.indexOf(e)+1];if(next&&!next.disabled&&/달력/.test(next.label)){task._calendarDate=value;return step('click',{ref:next.ref},'관찰한 날짜 입력란 옆 달력을 열어 요청한 날짜를 선택한다.');}return done('현재 날짜 입력란 옆의 실제 달력 버튼을 확인하지 못했습니다.');}if(e.tag==='select'){const option=e.options?.filter(o=>eq(o.text,value)||eq(o.value,value));if(option?.length!==1)return done('현재 선택지에서 요청한 '+value+' 값을 유일하게 확인하지 못했습니다.');return step('select',{ref:e.ref,value:option[0].value},'현재 실제 선택지와 요청 값을 대조해 선택한다.');}if(e.role==='combobox')return step('click',{ref:e.ref},'현재 실제 선택 목록을 연다.');return step('fill',{ref:e.ref,text:value},'사용자가 지정한 '+e.label+' 값만 입력한다.');}return null;};
  const options=els.filter(e=>e.role==='option'&&!e.disabled);if(options.length){const wanted=Object.values(p).filter(Boolean),matches=options.filter(e=>wanted.some(v=>eq(e.label,v)));if(matches.length===1)return step('click',{ref:matches[0].ref},'실제 관찰된 요청 값의 선택지만 고른다.');return done('현재 선택 목록에서 요청 값을 유일하게 구분하지 못했습니다.');}
  if(duty){
   const personField=find(/^(?:성명|이름|대상자|직원명|교직원명)$/),dates=find(/^(?:조회일자|조회일|기준일자|기준일|기간시작일자|기간종료일자|시작일자|종료일자)$/);
@@ -46,10 +58,10 @@ function neisStep(task,input,all){
    }
   }
  }else if(/출장.*신청|출장.*등록/.test((screen.dialog||'')+' '+(screen.title||'')+' '+(screen.text||''))){
-  const patterns=[[/^(?:출장시작일자|시작일자|신청기간시작일자)$/,p.date],[/^(?:출장종료일자|종료일자|신청기간종료일자)$/,p.endDate],[/^(?:시작시각|시작시간)$/,p.start],[/^(?:종료시각|종료시간)$/,p.end],[/^(?:출장지|목적지)$/,p.destination],[/^(?:출장목적|목적|용무|사유)$/,p.purpose],[/^교통수단$/,p.transport],[/^(?:여비|여비지급구분)$/,p.cost],[/^(?:출장구분|출장종류)$/,p.type]];
-  const change=set(patterns);if(change)return change;
-  const verified=patterns.slice(0,6).every(([re,v])=>find(re).some(e=>eq(e.value??e.display,v)));
-  if(verified)return done(`출장 입력값을 현재 화면에서 확인했습니다.\n${p.date}~${p.endDate} ${p.start}~${p.end} / ${p.destination} / ${p.purpose}\n결재선·여비 조건과 목록 재조회는 아직 확인하지 못했습니다. 미상신입니다. 이 상태는 출장 올리기 벤치 합격이 아닙니다.`);
+  const change=set(tripPatterns);if(change)return change;
+  const verified=tripPatterns.slice(0,6).every(([re,v])=>find(re).some(e=>eq(e.value??e.display,v)));
+  if(verified&&task.submit){if(!tripVerified(screen))return done('상신하려면 출장구분·교통수단·여비의 실제 요청값도 확인해야 합니다.');const next=find(/^승인요청$/);if(next.length===1)return step('click',{ref:next[0].ref},'입력값을 확인한 현재 출장의 결재선 준비 단계로 이동한다. 아직 최종 상신은 하지 않는다.');return done('현재 출장 입력에서 결재선 준비로 이동할 실제 버튼을 확인하지 못했습니다.');}
+  if(verified)return done('출장 입력값을 현재 화면에서 확인했습니다. 결재선과 서버 신청 목록은 아직 확인하지 못했으며 미상신입니다.');
  }
  const labels=duty?['교직원근무상황조회','직원근무상황관리','교원근무상황관리','근무상황조회','복무현황','복무','나이스']:['출장신청','출장신청관리','개인출장관리','출장관리','출장','복무','나이스'];
  for(const label of labels){const found=find(new RegExp('^'+label+'$'));if(found.length===1){const used=rows.some((r,i)=>r.name==='gyomu_browser'&&r.args.action==='click'&&!r.value.error&&rows.slice(0,i).findLast(x=>x.value.elements)?.value.elements?.some(e=>e.ref===r.args.ref&&fields(e)===label));if(!used)return step('click',{ref:found[0].ref},'현재 화면에서 확인한 '+label+' 메뉴로 이동한다.');}}

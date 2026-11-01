@@ -23,10 +23,12 @@ function edufineTask(prompt,history=[],now=new Date()){
  const saveIntent=source.replace(/["“][^"”]*["”]/g,'').replace(/임시\s*저장(?:은|는|을)?\s*(?:하지\s*(?:마|말)|금지)/g,'');
  task.writing=task.writing||/(?:기안|초안|WXS)/i.test(saveIntent)&&/임시\s*저장(?:을|도)?\s*(?:해|하|부탁|요청|[.!?。]|$)/.test(saveIntent);
  if(task.writing&&!/요약|열람|읽(?:어|고|기)|본문.{0,12}확인/.test(source))task.summary=false;
+ if(!task.target&&/처리\s*중(?:인)?\s*문서/.test(source))task.target='문서진행';
  task.progressReview=task.target==='문서진행'&&/상태|결재자|담당자|진행.{0,5}확인|문서.{0,5}확인/.test(source);
  task.summary=task.summary||/내용[\s\S]{0,20}(?:설명|보고|알려)/.test(source);
  task.allCirculation=/공람/.test(source)&&/모두|전체/.test(source)&&!/공람대기|공람완료/.test(source);if(task.allCirculation){task.target='공람대기';task.summary=true;task.reviewedTargets=[];}
- if(task.target==='문서진행'&&/나한테|나에게|내가\s*(?:처리|결재)|내\s*(?:담당|결재)/.test(source))task.target='업무담당확인';
+ if(task.target==='문서진행'&&/나한테|나에게|내가\s*(?:처리|결재)|내\s*(?:담당|결재)/.test(source)){task.target='업무담당확인';task.assignedToMe=true;if(!/(?:상태|결재자|담당자).{0,8}만|(?:본문|첨부).{0,12}(?:열|읽)지\s*(?:마|말)/.test(source))task.summary=true;}
+ if(task.summary)task.progressReview=false;
  return task;
 }
 function observedResult(value){value=compactDocument(value);const text=JSON.stringify(value);return text.length<=12000?value:{truncated:true,preview:text.slice(0,12000),note:'생략된 결과를 전체 확인으로 처리하지 않는다.'};}

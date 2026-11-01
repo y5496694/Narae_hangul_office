@@ -5,6 +5,7 @@ const {SchoolSessionKeeper,sessionTool}=require('./school-session.cjs');
 const messengerArchive=require('./messenger-archive.cjs');
 const portalLogin=require('./portal-login.cjs');
 const wxsContinuation=require('./wxs-continuation.cjs');
+const officeBench=require('./office-bench-status.cjs');
 const vendor=path.resolve(__dirname,'../vendor/narae-gyomu');
 class OfficeIntegrations{
  constructor({home,root,python,workspace,policy,settings,headed=true,busy=()=>true,notify=()=>{},browserEnvironment=()=>({})}){Object.assign(this,{home,root,python,workspace,policy,settings,headed,busy,notify,browserEnvironment});this.instance=null;this.catalog=[];}
@@ -22,13 +23,14 @@ class OfficeIntegrations{
   this.instance.browserCall=args=>this.browserCall(args);
   this.catalog=tools.filter(t=>!t.name.startsWith('hangul.')&&t.name!=='files.list'&&t.name!=='portal.login').map(t=>({type:'function',strict:false,name:'gyomu_'+t.name.replaceAll('.','_'),description:t.description+(t.name.endsWith('.prepare')||t.name==='wxs.save'?' 준비 후 PC에서 실제 미리보기를 승인한 경우에만 적용합니다.':''),parameters:t.parameters,original:t.name}));this.catalog.push(sessionTool);this.keeper=new SchoolSessionKeeper({browser:()=>this.instance.browser,enabled:()=>this.settings().keepSchoolSession!==false,busy:this.busy,notify:state=>{if(state.results.length){fs.mkdirSync(path.join(this.home,'logs'),{recursive:true});fs.appendFileSync(path.join(this.home,'logs/school-session.jsonl'),JSON.stringify({at:state.lastAt,results:state.results})+'\n');}this.notify({type:'schoolSession',state});}});this.keeper.start();return this;
  }
- async tools(){await this.ready();return [...this.catalog.map(({original,...tool})=>tool),messengerArchive.tool,portalLogin.tool,wxsContinuation.tool];}
+ async tools(){await this.ready();return [...this.catalog.map(({original,...tool})=>tool),messengerArchive.tool,portalLogin.tool,wxsContinuation.tool,officeBench.tool];}
  async browserCall(args){if(!this.instance.browser||this.instance.browser.closed){const mode=this.settings().browserMode==='extension'?'extension':'isolated',environment=mode==='extension'?await this.browserEnvironment():{};if(mode==='extension'&&!environment.PLAYWRIGHT_MCP_EXTENSION_TOKEN)throw new Error('설정 → 일반에서 확장 연결 토큰을 저장하거나 기존 Chrome 연결을 먼저 완료하세요.');if(mode==='isolated'&&['snapshot','read','tabs','frames'].includes(args.action))return {notStarted:true,url:'about:blank',title:'열린 업무 브라우저 없음',text:'',elements:[],tabs:[],frames:[],untrusted:true};await this.connectBrowser(mode,{environment});}return this.instance.browser.execute(args);}
  async makeBrowser(mode,{environment}={}){const session=this.session||'local';if(!/^(?:local|[a-f0-9]{32})$/.test(session))throw new Error('브라우저 대화 세션을 확인하세요.');const browser=new this.Browser({profile:this.headed?path.join(this.home,'data/gyomu-browser',session):undefined,connection:mode,connectionDirectory:path.join(this.home,'data/browser-connections',session),environment:environment||await this.browserEnvironment()});try{await browser.start({headed:this.headed});return browser;}catch(error){await browser.browser?.close().catch(()=>{});throw error;}}
  async browserState(){const browser=this.instance?.browser;if(!browser||browser.closed)return {connected:false};return {connected:true,mode:browser.attached?'extension':'isolated',...await browser.execute({action:'tabs'})};}
  async connectBrowser(mode,options={}){if(!['isolated','extension'].includes(mode))throw new Error('브라우저 연결 방식을 선택하세요.');if(this.browserStarting)return this.browserStarting;this.browserStarting=(async()=>{await this.ready();await this.keeper?.pending;const existing=this.instance.browser;if(existing&&!existing.closed&&(existing.attached?'extension':'isolated')===mode)return this.browserState();const browser=await this.makeBrowser(mode,options);this.instance.browser=browser;await existing?.browser?.close().catch(()=>{});return this.browserState();})();try{return await this.browserStarting;}finally{this.browserStarting=null;}}
  async disconnectBrowser(){await this.keeper?.pending;const browser=this.instance?.browser;if(browser){await browser.browser?.close();this.instance.browser=null;}return {connected:false};}
  async execute(name,args,signal){
+  if(name===officeBench.tool.name){validate(args,officeBench.tool.parameters);return officeBench.status({home:this.home});}
   await this.ready();if(signal?.aborted)throw new Error('작업을 중단했습니다.');
   this.wxsContinuationState||=new Map();
   if(name===wxsContinuation.tool.name){validate(args,wxsContinuation.tool.parameters);return wxsContinuation.execute(args,{instance:this.instance,policy:this.policy,state:this.wxsContinuationState,signal});}
