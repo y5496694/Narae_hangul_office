@@ -38,6 +38,8 @@ jobs:
         run: npm run test:local:desktop
       - name: Unified settings and agent layout
         run: npm run test:settings:desktop
+      - name: Certificate registration and editing with isolated DPAPI data
+        run: npm run test:certificate:desktop
       - name: Existing Chrome connection settings with synthetic tabs
         run: node tests/browser-settings-desktop.cjs
       - name: Tray lifecycle and compact command windows

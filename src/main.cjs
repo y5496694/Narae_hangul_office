@@ -16,7 +16,7 @@ const authorise=file=>{if(typeof file!=='string'||!path.isAbsolute(file))throw n
 const document=file=>{file=authorise(file);require('./format-policy.cjs').assertDocument(file);return file;};
 function output(file){file=path.isAbsolute(file)?path.resolve(file):path.resolve(settings.workspace,file);if(!inside(settings.workspace,file))throw new Error('새 파일은 작업 폴더 안에 저장하세요.');let parent=path.dirname(file);while(!fs.existsSync(parent))parent=path.dirname(parent);if(!inside(fs.realpathSync(settings.workspace),fs.realpathSync(parent)))throw new Error('출력 폴더의 연결 경로가 작업 범위 밖입니다.');if(fs.existsSync(file)&&!inside(fs.realpathSync(settings.workspace),fs.realpathSync(file)))throw new Error('출력 파일의 연결 경로가 작업 범위 밖입니다.');return file;}
 function metadata(){let auth,error;try{auth=oauth.state();}catch{auth={profiles:[],selected:{}};error='계정 저장소를 읽을 수 없습니다. 현재 Windows 사용자로 다시 연결하세요.';}return {version:require('../package.json').version,settings,auth,authError:error,hasKey:Object.fromEntries(Object.entries(keys).map(([name,key])=>{try{return[name,Boolean(key.get())];}catch{return[name,false];}})),school:require('./school-region.cjs').state(home),recent,history,home,pythonAvailable:fs.existsSync(python),hancom:require('./hancom.cjs').discoverHancom(),running:Boolean(controller)};}
-function idle(){if(browserConnectionChange)throw new Error('Chrome 연결 화면에서 탭을 선택하고 있습니다. 연결을 마친 뒤 요청하세요.');if(connectionChange)throw new Error('카카오톡 연결 승인을 처리하고 있습니다. 잠시 뒤 다시 요청하세요.');if(controller)throw new Error('AI 작업을 마치거나 중지한 뒤 연결 설정을 바꾸세요.');}
+function idle(){if(certificateSettings.saving)throw new Error('인증서 저장을 마친 뒤 작업을 시작하세요.');if(browserConnectionChange)throw new Error('Chrome 연결 화면에서 탭을 선택하고 있습니다. 연결을 마친 뒤 요청하세요.');if(connectionChange)throw new Error('카카오톡 연결 승인을 처리하고 있습니다. 잠시 뒤 다시 요청하세요.');if(controller)throw new Error('AI 작업을 마치거나 중지한 뒤 연결 설정을 바꾸세요.');}
 function startTask(){idle();const active=new AbortController();let finish;taskDone=new Promise(resolve=>{finish=resolve;});controller=active;active.finish=()=>{if(controller===active)controller=null;finish();};return active;}
 async function credential(config){return config.connectionMode==='oauth'?oauth.credential(config.provider):undefined;}
 async function models(){const config=structuredClone(settings);if(config.provider==='local')return localAI.listModels(config);return provider.listModels({settings:config,credential:await credential(config),apiKey:config.connectionMode==='api'?keys[config.provider].get():undefined});}
@@ -56,6 +56,7 @@ const {AgentConversations}=require('./agent-conversations.cjs'),{OfficeIntegrati
 const conversations=new AgentConversations(home);
 const {BrowserEnvironment}=require('./browser-environment.cjs');
 const browserEnvironmentStore=new BrowserEnvironment(new KeyStore(home,python,'browser-extension-env'));
+const certificateSettings=new (require('./certificate-settings.cjs').CertificateSettings)(home);
 async function browserEnvironment(){const values=browserEnvironmentStore.environment();if(!values.PLAYWRIGHT_MCP_EXTENSION_TOKEN){const module=await import(require('node:url').pathToFileURL(path.join(root,'vendor/narae-gyomu/packages/narae_browser/src/existing-browser.mjs')).href);const token=module.extensionToken();if(token)values.PLAYWRIGHT_MCP_EXTENSION_TOKEN=token;}return values;}
 const browserEnvironmentState=async()=>browserEnvironmentStore.state(await browserEnvironment());
 const integrations=new OfficeIntegrations({home,root,python,workspace:()=>settings.workspace,settings:()=>settings,policy:remotePolicy,busy:()=>Boolean(controller)||browserConnectionChange,notify:emit,browserEnvironment});
@@ -95,6 +96,9 @@ async function approveRemote(){
 }
 async function preview(args){const file=document(args.path),hash=createHash('sha256').update(fs.readFileSync(file)).digest('hex'),pdf=path.join(home,'cache',hash+'.pdf');return native.savedFileOperation(file,{},async()=>{if(!fs.existsSync(pdf))await runPython(python,home,'documents.py',{action:'previewNativeHangul',path:file,target:pdf});return runPython(python,home,'documents.py',{action:'inspect',path:pdf,page:args.page||0});});}
 const methods={
+ certificateState:()=>certificateSettings.state(),
+ certificateSave:args=>{idle();return certificateSettings.save(args);},
+ certificateChoosePath:async()=>{idle();const picked=await dialog.showOpenDialog(window,{properties:['openDirectory'],title:'인증서가 저장된 폴더 선택'});return picked.canceled?null:fs.realpathSync(picked.filePaths[0]);},
  browserState:()=>integrations.browserState(),
  browserEnvironmentState,
  browserEnvironmentSave:async args=>{idle();const result=browserEnvironmentStore.save(args);if(result.changed)await integrations.disconnectBrowser();return browserEnvironmentState();},
