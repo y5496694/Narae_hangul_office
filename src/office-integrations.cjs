@@ -66,7 +66,7 @@ class OfficeIntegrations{
   if(args.config?.attachments)args.config.attachments=args.config.attachments.map(register);
   if(tool.original==='browser'){
    if(args.action==='download'){args.path=this.policy.allowed(args.path);this.instance.downloadRoot=this.workspace();}
-   if(args.action==='click'&&this.instance.browser){const b=this.instance.browser,{locator}=b.ref(args.ref);if(require('./school-region.cjs').edufineHost(new URL(b.scope().url()).hostname)&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))b.externalNativeBaseline=(await this.instance.wxs(['windows'],signal)).windows;}
+   if(args.action==='click'&&this.instance.browser){const b=this.instance.browser,{locator}=b.ref(args.ref);if(require('./school-region.cjs').edufineHost(new URL(b.scope().url()).hostname)&&/^(?:fncFormDraft|fncDoCallGian|doCallClientApp|doCallClientAppExtra|fncRedrft)\(/.test(await locator.getAttribute('onclick')||''))b.externalNativeBaseline=(await this.instance.wxs(['windows'],signal)).windows;}
    if(args.action==='open'){let url;try{url=new URL(args.url);}catch{throw new Error('웹 주소를 확인하세요.');}if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw new Error('HTTP(S) 웹 주소만 지원합니다.');}
    if(['fill','type','press'].includes(args.action))await this.noCredentialInput(args);
    if(!['snapshot','read','tabs','frames','frame','scroll','wait','diagnostics'].includes(args.action)){await this.policy.approve('나래 브라우저 · '+args.action,args,signal);if(['fill','type','press'].includes(args.action))await this.noCredentialInput(args);}

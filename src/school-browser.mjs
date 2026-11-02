@@ -35,20 +35,24 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
    const permissions={};for(const name of ['local-network-access','loopback-network','local-network'])try{permissions[name]=(await navigator.permissions.query({name})).state;}catch{permissions[name]='unsupported';}
    return {title:document.title,origin:location.origin,permissions,loading:[...document.querySelectorAll('.isloading-overlay,[role=progressbar]')].map(e=>({visible:e.getBoundingClientRect().width>0&&getComputedStyle(e).display!=='none',text:(e.innerText||'').slice(0,150)})),localResources:performance.getEntriesByType('resource').flatMap(e=>{try{const u=new URL(e.name);return /^(?:localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname)?[{origin:u.origin,path:u.pathname,duration:Math.round(e.duration),transferSize:e.transferSize}]:[];}catch{return [];}}).slice(-20)};
   });
-  return {...current,networkFailures:(this.networkFailures||[]).map(({origin,path,code})=>/^https?:\/\//.test(origin)?{origin,path:/^\/[\w/.-]{0,160}$/.test(path)?path:'[redacted]',code}:{origin:'[local-application]',code}),externalClickObserved:Boolean(this.externalIntent),...(this.pendingExternalApp?{externalApplication:{id:this.pendingExternalApp.id,scheme:this.pendingExternalApp.scheme,sourceOrigin:this.pendingExternalApp.sourceOrigin,formatTitle:this.pendingExternalApp.formatTitle,authority:(/^[A-Za-z0-9.:-]{0,50}$/.test(new URL(this.pendingExternalApp.url).host)?new URL(this.pendingExternalApp.url).host:'[redacted]'),launched:Boolean(this.pendingExternalApp.launched)}}:{}),untrusted:true};
+  return {...current,networkFailures:(this.networkFailures||[]).map(({origin,path,scheme,code})=>/^https?:\/\//.test(origin)?{origin,path:/^\/[\w/.-]{0,160}$/.test(path)?path:'[redacted]',code}:{origin:'[local-application]',...(/^[a-z][a-z0-9+.-]{0,30}:$/.test(scheme||'')?{scheme}:{}),code}),externalClickObserved:Boolean(this.externalIntent),...(this.pendingExternalApp?{externalApplication:{id:this.pendingExternalApp.id,scheme:this.pendingExternalApp.scheme,sourceOrigin:this.pendingExternalApp.sourceOrigin,formatTitle:this.pendingExternalApp.formatTitle,authority:(/^[A-Za-z0-9.:-]{0,50}$/.test(new URL(this.pendingExternalApp.url).host)?new URL(this.pendingExternalApp.url).host:'[redacted]'),launched:Boolean(this.pendingExternalApp.launched)}}:{}),untrusted:true};
  }
- captureExternalUri(raw,intent){let url;try{url=new URL(raw);}catch{return;}if(!intent||Date.now()-intent.at>15000||url.protocol!=='wxsclient:'||!/^\/open&url:[A-Za-z0-9+/%=]+&title:/.test(url.pathname))return;if(this.pendingExternalApp?.url===raw)return;this.pendingExternalApp={id:randomUUID(),scheme:'wxsclient',sourceOrigin:intent.sourceOrigin,formatTitle:intent.formatTitle,url:raw,launched:false,...(Array.isArray(intent.nativeBaseline)?{nativeBaseline:intent.nativeBaseline}:{})};}
- async prepareExternalCapture(locator,entry){
-  this.externalIntent={page:this.page,at:Date.now(),sourceOrigin:new URL(this.scope().url()).origin,formatTitle:entry.label.replace(/\s*새창열기$/,'').trim(),nativeBaseline:this.externalNativeBaseline};this.externalNativeBaseline=undefined;
+ captureExternalUri(raw,intent){let url;try{url=new URL(raw);}catch{return;}if(!intent||Date.now()-intent.at>15000||url.protocol!=='wxsclient:'||!/^\/open&url:[A-Za-z0-9+/%=]+&title:/.test(url.pathname))return;if(this.pendingExternalApp?.url===raw)return;this.pendingExternalApp={id:randomUUID(),scheme:'wxsclient',sourceOrigin:intent.sourceOrigin,formatTitle:intent.formatTitle,url:raw,launched:false,...(intent.document?{document:intent.document}:{}),...(Array.isArray(intent.nativeBaseline)?{nativeBaseline:intent.nativeBaseline}:{})};}
+ async prepareExternalCapture(locator,entry,document){
+  this.externalIntent={page:this.page,at:Date.now(),sourceOrigin:new URL(this.scope().url()).origin,formatTitle:entry.label.replace(/\s*새창열기$/,'').trim(),nativeBaseline:this.externalNativeBaseline,...(document?{document}:{})};this.externalNativeBaseline=undefined;
   this.externalBindings||=new WeakMap();let binding=this.externalBindings.get(this.page);if(!binding){binding='__naraeWxs_'+randomUUID().replaceAll('-','');const page=this.page;await page.exposeBinding(binding,(_source,raw)=>{const intent=this.externalIntent;if(intent?.page===page)this.captureExternalUri(raw,intent);});this.externalBindings.set(page,binding);}
-  await this.scope().evaluate(binding=>{const record=value=>{if(typeof value==='string'&&/^wxsclient:/i.test(value))void window[binding](value);},scan=node=>{if(node.nodeType!==1)return;if(node.matches('iframe,frame'))record(node.getAttribute('src'));node.querySelectorAll?.('iframe,frame').forEach(e=>record(e.getAttribute('src')));};const observer=new MutationObserver(records=>{for(const r of records){if(r.type==='attributes'){record(r.oldValue);record(r.target.getAttribute('src'));}for(const node of r.addedNodes)scan(node);}});observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src'],attributeOldValue:true});setTimeout(()=>observer.disconnect(),15000);},binding);
+  const origin=this.externalIntent.sourceOrigin;
+  for(const frame of this.page.frames()){
+   let sameOrigin=false;try{sameOrigin=new URL(frame.url()).origin===origin;}catch{}if(!sameOrigin)continue;
+   await frame.evaluate(binding=>{const record=value=>{if(typeof value==='string'&&/^wxsclient:/i.test(value))void window[binding](value);},scan=node=>{if(node.nodeType!==1)return;if(node.matches('iframe,frame'))record(node.getAttribute('src'));node.querySelectorAll?.('iframe,frame').forEach(e=>record(e.getAttribute('src')));};const observer=new MutationObserver(records=>{for(const r of records){if(r.type==='attributes'){record(r.oldValue);record(r.target.getAttribute('src'));}for(const node of r.addedNodes)scan(node);}});observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src'],attributeOldValue:true});setTimeout(()=>observer.disconnect(),15000);},binding);
+  }
  }
  watchExternalApps(){
   if(!this.context?.pages)return;
   this.externalIntentPages||=new WeakSet();for(const page of this.context.pages())if(!this.externalIntentPages.has(page)){this.externalIntentPages.add(page);page.on('requestfailed',request=>{const intent=this.externalIntent;if(intent?.page===page)this.captureExternalUri(request.url(),intent);});}
  }
  watchNetwork(){
-  this.networkPages||=new WeakSet();for(const page of this.context.pages())if(!this.networkPages.has(page)){this.networkPages.add(page);page.on('requestfailed',request=>{let u;try{u=new URL(request.url());}catch{return;}this.networkFailures||=[];this.networkFailures.push({origin:['http:','https:'].includes(u.protocol)?u.origin:'[local-application]',...(['http:','https:'].includes(u.protocol)?{path:u.pathname}:{}),code:String(request.failure()?.errorText||'').match(/(?:net::)?ERR_[A-Z0-9_]+/)?.[0]||'NETWORK_FAILED'});this.networkFailures=this.networkFailures.slice(-20);});}
+  this.networkPages||=new WeakSet();for(const page of this.context.pages())if(!this.networkPages.has(page)){this.networkPages.add(page);page.on('requestfailed',request=>{let u;try{u=new URL(request.url());}catch{return;}this.networkFailures||=[];this.networkFailures.push({origin:['http:','https:'].includes(u.protocol)?u.origin:'[local-application]',...(['http:','https:'].includes(u.protocol)?{path:u.pathname}:{scheme:u.protocol}),code:String(request.failure()?.errorText||'').match(/(?:net::)?ERR_[A-Z0-9_]+/)?.[0]||'NETWORK_FAILED'});this.networkFailures=this.networkFailures.slice(-20);});}
  }
  installFinalDialogs(){
   const watch=page=>{page.removeAllListeners('dialog');page.on('dialog',async dialog=>{const auth=this.finalAuthorization;
@@ -149,7 +153,20 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
   const origin=this.page,popup=command.action==='click'?this.context.waitForEvent('page',{timeout:1500}).catch(()=>null):null;let clickedLabel,queryNavigation;const commitDate=command.action==='fill'&&/등록일자|신청일자|시작일자|종료일자/.test(this.ref(command.ref).entry.label);
   if(command.action==='click'){
    const {entry,locator}=this.ref(command.ref),label=entry.label.replace(/\s+/g,'');
-   if(regional.edufineHost(new URL(this.scope().url()).hostname)&&/^fncFormDraft\(/.test(await locator.getAttribute('onclick')||''))await this.prepareExternalCapture(locator,entry);
+   const launchHandler=await locator.getAttribute('onclick')||'';
+   if(regional.edufineHost(new URL(this.scope().url()).hostname)){
+    if(/^(?:fncFormDraft|fncDoCallGian|doCallClientApp|doCallClientAppExtra)\(/.test(launchHandler)){
+     const matches=(this.lastObservation?.documentRows||[]).filter(r=>r.title===entry.label);
+     const document=matches.length===1&&matches[0].documentIds.length===1?{id:matches[0].documentIds[0],title:matches[0].title,operation:'read'}:undefined;
+     await this.prepareExternalCapture(locator,entry,document);
+    }
+    else if(/^fncRedrft\(/.test(launchHandler)){
+     const selected=(this.lastObservation?.documentRows||[]).filter(r=>r.selected);
+     if(selected.length!==1||selected[0].status!=='회수')throw new Fault('RECALLED_DOCUMENT_REQUIRED','회수 상태 문서 한 건을 선택한 뒤 재작성하세요.');
+     if(selected[0].documentIds.length!==1)throw new Fault('DOCUMENT_ID_REQUIRED','문서 식별자 한 개가 확인되어야 합니다.');
+     await this.prepareExternalCapture(locator,{...entry,label:selected[0].title},{id:selected[0].documentIds[0],title:selected[0].title,operation:'edit-recalled'});
+    }
+   }
    clickedLabel=label;
    if(/^(조회|검색)$/.test(label))queryNavigation=this.scope().waitForNavigation({waitUntil:'domcontentloaded',timeout:5000}).catch(()=>null);
    if(!finalOperation(entry.label)){this.clickAttempts||=new Map();const signature=this.clickIdentity(entry,label),attempts=this.clickAttempts.get(signature)||0;if(attempts>=3)throw new Fault('REPEATED_UI_ACTION','같은 화면·입력값에서 같은 버튼을 반복해 중지했습니다. 현재 탭을 유지하고 작업을 확인하세요.');this.clickAttempts.set(signature,attempts+1);}
