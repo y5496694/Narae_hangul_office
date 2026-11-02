@@ -14,6 +14,16 @@ def request(target="https://klef.cbe.go.kr/bms/cz/cb/prc/wxsLogin.do?path=SYNTHE
 
 
 class LaunchTests(unittest.TestCase):
+    def test_saved_draft_four_space_title_requires_saved_row_binding(self):
+        envelope=base64.b64encode(b'__key=synthetic-key&__sId=synthetic-session&__type=GET').decode()
+        raw=request(target='https://klef.cbe.go.kr/bms/cz/cb/prc/wxsLogin.do?path='+envelope,title='    ')
+        raw['format_title']='가상 임시저장'
+        raw['document']={'id':'M10TEST000000000001','title':raw['format_title'],'operation':'read'}
+        with self.assertRaises(ValueError): module.validate_request(raw)
+        raw['document']['operation']='edit-saved'
+        self.assertEqual(module.validate_request(raw)['document']['operation'],'edit-saved')
+        raw['url']=request(title='    ')['url']
+        with self.assertRaises(ValueError): module.validate_request(raw)
     def test_existing_document_blank_title_requires_observed_binding_and_authenticated_envelope(self):
         envelope=base64.b64encode(b'__key=synthetic-key&__sId=synthetic-session&__type=GET').decode()
         raw=request(target='https://klef.cbe.go.kr/bms/cz/cb/prc/wxsLogin.do?path='+envelope,title='   ')

@@ -33,7 +33,7 @@ def validate_request(request):
         if (not isinstance(document, dict) or set(document) != {'id', 'title', 'operation'}
                 or not isinstance(document['id'], str) or not re.fullmatch(r'[A-Z][A-Z0-9]{17,31}', document['id'])
                 or document['title'] != request['format_title'] or not document['title'].strip()
-                or len(document['title']) > 200 or document['operation'] not in ('read', 'edit-recalled')):
+                or len(document['title']) > 200 or document['operation'] not in ('read', 'edit-recalled', 'edit-saved')):
             raise ValueError('Expected the exact browser-observed document binding')
         # Existing-document launches use a blank native window title and an
         # opaque authenticated handoff. Bind the observed row and operation;
@@ -44,7 +44,8 @@ def validate_request(request):
             opaque_handoff = set(query) == {'path'} and all(envelope.get(k) for k in ('__key','__sId','__type')) and envelope['__type'] == ['GET']
         except Exception:
             opaque_handoff = False
-        title_matches = title_matches or (title == '   ' and opaque_handoff)
+        blank_title = title == '   ' or (title == '    ' and document['operation'] == 'edit-saved')
+        title_matches = title_matches or (blank_title and opaque_handoff)
     if not valid or not title_matches or len(title) > 200 or not re.fullmatch(r"\d{3,4},\d{3,4}", size):
         raise ValueError("WXS target, observed format title or window size differs")
     return {"protocol": "wxsclient", "format_title": request['format_title'], "source_origin": request["source_origin"], **({'document':document} if document else {})}

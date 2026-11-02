@@ -11,7 +11,8 @@ function calendarChanged(expected){
  return expected===undefined?state:state!==expected;
 }
 function documentRowsDOM(){
- if(!/\/retrieveSanctnProgrsDocList\.do$/.test(location.pathname))return [];
+ if(!/\/(retrieveSanctnProgrsDocList|retrieveTmprCstdyDocList)\.do$/.test(location.pathname))return [];
+ const saved=/\/retrieveTmprCstdyDocList\.do$/.test(location.pathname);
  return [...document.querySelectorAll('tr')].flatMap(row=>{
   const checkbox=row.querySelector('input[type=checkbox]');if(!checkbox)return [];
   const cells=[...row.cells].map(c=>c.innerText.replace(/\s+/g,' ').trim()),headers=[...row.closest('table')?.querySelectorAll('thead tr:last-child th')||[]].map(c=>c.innerText.replace(/\s+/g,''));
@@ -23,7 +24,7 @@ function documentRowsDOM(){
   if(/^[A-Z][A-Z0-9]{17,31}$/.test(checkboxId))ids.add(checkboxId);
   else for(const e of row.querySelectorAll('a[onclick]'))for(const id of (e.getAttribute('onclick')||'').match(/\b[A-Z][A-Z0-9]{17,31}\b/g)||[])ids.add(id);
   const title=titleIndex>=0?cells[titleIndex]:[...row.querySelectorAll('a')].find(e=>(e.innerText||'').trim().length>5)?.innerText.replace(/\s+/g,' ').trim();
-  return title&&ids.size?[{title,status:statusIndex>=0?cells[statusIndex]:cells.find(c=>/^(?:기안)?회수$/.test(c))||'',text:row.innerText.replace(/\s+/g,' ').trim(),documentIds:[...ids],selected:checkbox.checked,checkboxRef:checkbox.getAttribute('data-narae-ref')}]:[];
+  return title&&ids.size?[{title,status:statusIndex>=0?cells[statusIndex]:cells.find(c=>/^(?:기안)?회수$/.test(c))||'',text:row.innerText.replace(/\s+/g,' ').trim(),documentIds:[...ids],selected:checkbox.checked,checkboxRef:checkbox.getAttribute('data-narae-ref'),...(saved?{saved:true}:{})}]:[];
  });
 }
 export class OfficeSchoolBrowser extends SchoolBrowser {
@@ -157,7 +158,7 @@ export class OfficeSchoolBrowser extends SchoolBrowser {
    if(regional.edufineHost(new URL(this.scope().url()).hostname)){
     if(/^(?:fncFormDraft|fncDoCallGian|doCallClientApp|doCallClientAppExtra)\(/.test(launchHandler)){
      const matches=(this.lastObservation?.documentRows||[]).filter(r=>r.title===entry.label);
-     const document=matches.length===1&&matches[0].documentIds.length===1?{id:matches[0].documentIds[0],title:matches[0].title,operation:'read'}:undefined;
+     const document=matches.length===1&&matches[0].documentIds.length===1?{id:matches[0].documentIds[0],title:matches[0].title,operation:matches[0].saved?'edit-saved':'read'}:undefined;
      await this.prepareExternalCapture(locator,entry,document);
     }
     else if(/^fncRedrft\(/.test(launchHandler)){
