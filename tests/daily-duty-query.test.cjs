@@ -18,3 +18,7 @@ test('unread controls are inspected after querying, while later observations pre
  const t=task(),s={...screen(),hasMore:true,nextOffset:50},input=[...pair({action:'snapshot'},s,'before'),...pair({action:'click',ref:'query'},s,'queried')];let step=neisStep(t,input,[tool]);assert.deepEqual(step.tools[0].parameters.properties.offset.enum,[50]);
  input.push(...pair({action:'snapshot',offset:50,limit:100},{...screen(),elements:[]},'remaining'));step=neisStep(t,input,[tool]);assert.match(step.receipt,/가상민/);assert.match(step.receipt,/총 1건 대조/);
 });
+test('a fixed next-step request does not duplicate the whole school table into the model context',()=>{
+ const t=task(),s=screen();s.tables=['UNRELATED_PRIVATE_CANARY'.repeat(5000)];s.text+='\nUNRELATED_PRIVATE_CANARY'.repeat(5000);const step=neisStep(t,pair({action:'snapshot'},s,'before'),[tool]);
+ assert.deepEqual(step.context.elements.map(e=>e.ref),['query']);assert(!JSON.stringify(step.context).includes('UNRELATED_PRIVATE_CANARY'));assert(JSON.stringify(step.context).length<1000);
+});
