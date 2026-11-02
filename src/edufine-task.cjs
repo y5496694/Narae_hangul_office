@@ -20,7 +20,7 @@ function edufineTools(all,task){const native=new Set(task?.writing?['gyomu_wxs',
 function edufineTask(prompt,history=[],now=new Date()){
  const task=edufineTaskBase(/WXS/i.test(prompt)?'에듀파인 '+prompt:prompt,history,now);if(!task)return null;
  const source=/^(계속|로그인.*완료|진행|다음)/.test(prompt)?(history.findLast(i=>i.role==='user')?.content||'')+'\n'+prompt:prompt;
- task.readLimit=/한\s*건/.test(source)?1:Number(source.match(/(?:최근\s*)?(\d+)\s*건/)?.[1])||null;
+ task.readLimit=/한\s*건(?!\s*씩)/.test(source)?1:Number(source.match(/(?:최근\s*)?(\d+)\s*건(?!\s*씩)/)?.[1])||null;
  const saveIntent=source.replace(/["“][^"”]*["”]/g,'').replace(/임시\s*저장(?:은|는|을)?\s*(?:하지\s*(?:마|말)|금지)/g,'');
  task.writing=task.writing||/(?:기안|초안|WXS)/i.test(saveIntent)&&/임시\s*저장(?:을|도)?\s*(?:(?:이어서|계속|좀|바로)\s*)?(?:해|하|부탁|요청|[.!?。]|$)/.test(saveIntent);
  if(task.writing&&!/요약|열람|읽(?:어|고|기)|본문.{0,12}확인/.test(source))task.summary=false;
@@ -28,8 +28,8 @@ function edufineTask(prompt,history=[],now=new Date()){
  if(!task.target&&/처리\s*중(?:인)?\s*문서/.test(source))task.target='문서진행';
  task.progressReview=task.target==='문서진행'&&/상태|결재자|담당자|진행.{0,5}확인|문서.{0,5}확인/.test(source);
  task.summary=task.summary||/내용[\s\S]{0,20}(?:설명|보고|알려)/.test(source);
- task.allCirculation=/공람/.test(source)&&/모두|전체/.test(source)&&!/공람대기|공람완료/.test(source);if(task.allCirculation){task.target='공람대기';task.summary=true;task.reviewedTargets=[];}
- if(task.target==='문서진행'&&/나한테|나에게|내가\s*(?:처리|결재)|내\s*(?:담당|결재)/.test(source)){task.target='업무담당확인';task.assignedToMe=true;if(!/(?:상태|결재자|담당자).{0,8}만|(?:본문|첨부).{0,12}(?:열|읽)지\s*(?:마|말)/.test(source))task.summary=true;}
+ task.allCirculation=/공람/.test(source)&&/모두|전체/.test(source)&&(!/공람대기|공람완료/.test(source)||/공람대기/.test(source)&&/공람완료/.test(source));if(task.allCirculation){task.target='공람대기';task.summary=true;task.reviewedTargets=[];}
+ if(task.target==='문서진행'&&/나한테|나에게|내가\s*(?:처리|결재)|내\s*(?:담당|결재)/.test(source)){task.target='업무담당확인';task.route='접수함';task.assignedToMe=true;if(!/(?:상태|결재자|담당자).{0,8}만|(?:본문|첨부).{0,12}(?:열|읽)지\s*(?:마|말)/.test(source))task.summary=true;}
  if(task.summary)task.progressReview=false;
  task.entryCheck=!task.writing&&!task.summary&&!task.target&&/진입.{0,8}(?:상태|확인)|업무\s*화면.{0,8}(?:진입|확인)/.test(source);
  task.nativeWrite=task.writing&&/현재\s*열린\s*WXS|이미\s*열린\s*WXS/i.test(source);if(task.nativeWrite)task.observe=false;

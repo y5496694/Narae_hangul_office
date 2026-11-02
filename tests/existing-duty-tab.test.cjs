@@ -1,0 +1,18 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {neisTask,neisStep}=require('../src/neis-task.cjs');
+const tool={name:'gyomu_browser',parameters:{type:'object',properties:{action:{enum:['snapshot','tabs','tab','click']}},required:['action']}};
+const pair=(args,value,id)=>[{type:'function_call',name:'gyomu_browser',arguments:JSON.stringify(args),call_id:id},{type:'function_call_output',call_id:id,output:JSON.stringify(value)}];
+test('duty lookup switches from Edufine to the unique observed NEIS tab before selecting a menu',()=>{
+ const task=neisTask('나이스 대상 "가상민"의 2039-05-04 복무 조회'),input=pair({action:'snapshot'},{title:'K-에듀파인　_WebDRM',elements:[]},'first');
+ assert.deepEqual(neisStep(task,input,[tool]).tools[0].parameters.properties.action.enum,['tabs']);
+ input.push(...pair({action:'tabs'},{tabs:[{index:0,title:'K-에듀파인',active:true},{index:3,title:'나이스',active:false}]},'tabs'));
+ let step=neisStep(task,input,[tool]);assert.deepEqual(step.tools[0].parameters.properties.action.enum,['tab']);assert.deepEqual(step.tools[0].parameters.properties.index.enum,[3]);
+ input.push(...pair({action:'tab',index:3},{title:'나이스',elements:[{label:'복무',ref:'current/duty'}]},'switched'));
+ step=neisStep(task,input,[tool]);assert.deepEqual(step.tools[0].parameters.properties.action.enum,['click']);assert.deepEqual(step.tools[0].parameters.properties.ref.enum,['current/duty']);
+});
+test('missing or ambiguous NEIS tabs stop without opening another window or claiming a lookup',()=>{
+ for(const tabs of [[],[{index:2,title:'나이스'},{index:3,title:'나이스'}]]){
+  const task=neisTask('나이스 대상 "가상민"의 2039-05-04 복무 조회'),input=[...pair({action:'snapshot'},{title:'업무포털 메인',elements:[]},'first'),...pair({action:'tabs'},{tabs},'tabs')],step=neisStep(task,input,[tool]);
+  assert.deepEqual(step.tools,[]);assert.match(step.receipt,/미완료/);assert.match(step.receipt,/새 창은 열지/);
+ }
+});
