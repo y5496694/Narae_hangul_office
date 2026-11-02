@@ -51,6 +51,33 @@ function neisStep(task,input,all){
  const options=els.filter(e=>e.role==='option'&&!e.disabled);if(options.length){const wanted=Object.values(p).filter(Boolean),matches=options.filter(e=>wanted.some(v=>eq(e.label,v)));if(matches.length===1)return step('click',{ref:matches[0].ref},'실제 관찰된 요청 값의 선택지만 고른다.');return done('현재 선택 목록에서 요청 값을 유일하게 구분하지 못했습니다.');}
  if(duty){
   const personField=find(/^(?:성명|이름|대상자|직원명|교직원명)$/),dates=find(/^(?:조회일자|조회일|기준일자|기준일|기간시작일자|기간종료일자|시작일자|종료일자)$/);
+  const daily=/일일근무상황조회/.test(screen.text||'')&&observations.some(r=>r.value.elements?.some(e=>fields(e)==='일자'));
+  if(daily&&!personField.length){
+   const date=find(/^일자$/)[0],department=find(/^부서$/)[0],account=find(/^나의업무$/)[0];
+   if(date&&department&&account){
+    const school=account.display||account.value,organization=department.display||department.value;
+    if(!school||!organization||!eq(school,organization)||p.organization&&!eq(organization,p.organization))return done('현재 계정의 소속 학교와 일일근무상황 조회 부서를 일치하게 확인하지 못했습니다. 다른 학교로 범위를 넓히지 않았습니다.');
+    const descendants=find(/^하위기관포함여부$/);if(descendants.some(e=>e.checked===true))return step('uncheck',{ref:descendants.find(e=>e.checked===true).ref},'우리 학교 범위로 조회하도록 현재 선택된 하위기관 포함 조건을 해제한다.');
+    const change=set([[/^일자$/,p.date]]);if(change)return change;
+    const lastChange=rows.findLastIndex(r=>r.name==='gyomu_browser'&&['fill','select','uncheck'].includes(r.args.action)&&!r.value.error),lastQuery=rows.findLastIndex((r,i)=>r.name==='gyomu_browser'&&r.args.action==='click'&&!r.value.error&&rows.slice(0,i).findLast(x=>x.value.elements)?.value.elements.some(e=>e.ref===r.args.ref&&fields(e)==='조회'));
+    if(lastQuery<=lastChange){const query=find(/^조회$/);if(query.length===1)return step('click',{ref:query[0].ref},'현재 계정의 학교·요청 날짜·하위기관 제외 조건을 확인하고 일일근무상황을 실제 조회한다.');return done('일일근무상황의 실제 조회 버튼을 유일하게 확인하지 못했습니다.');}
+    task._dailyConditions={school:organization,date:p.date,queryAt:lastQuery};
+   }
+   if(!task._dailyConditions)return step('snapshot',{limit:100},'일일근무상황의 실제 일자·부서·계정 소속 조건을 먼저 확인한다.');
+   if(screen.hasMore)return step('snapshot',{offset:screen.nextOffset,limit:100},'일일근무상황의 남은 실제 컨트롤과 다음 페이지 유무를 확인한다.');
+   const tables=(screen.tableData||[]).filter(t=>t.headers?.some(h=>h==='성명')&&t.headers.some(h=>/근무상황/.test(h))),signature=JSON.stringify(tables),next=find(/^(?:다음페이지|다음쪽|›|»)$/);
+   if(!tables.length||tables.some(t=>t.hasMore))return done('일일근무상황 결과 표가 없거나 일부 행이 생략되어 전체 확인으로 처리하지 않았습니다.');
+   if(task._nextDutyPage===signature)return done('다음 페이지가 같은 일일근무상황 결과를 반환했습니다. 전체로 처리하지 않았습니다.');
+   task._dutyPages||=new Map();task._dutyPages.set(signature,tables);
+   if(next.length===1){task._nextDutyPage=signature;return step('click',{ref:next[0].ref},'같은 학교·날짜 조건의 실제 다음 일일근무상황 페이지를 읽는다.');}
+   const allTables=[...task._dutyPages.values()].flat(),count=allTables.reduce((n,t)=>n+t.rows.length,0),total=screen.text?.match(/\bTotal\s+([\d,]+)/i)?.[1];
+   if(total===undefined||Number(total.replaceAll(',',''))!==count)return done('일일근무상황의 총 건수와 읽은 결과 행 수를 대조하지 못했습니다. 전체 조회로 처리하지 않았습니다.');
+   for(const table of allTables){const org=table.headers.findIndex(h=>/^(?:부서|학교|소속|기관)$/.test(h));if(org<0||table.rows.some(r=>!eq(r[org],task._dailyConditions.school)))return done('일일근무상황 결과에 현재 계정의 학교와 다른 소속이 있거나 소속 열을 확인하지 못했습니다.');}
+   const matching=allTables.flatMap(t=>{const name=t.headers.indexOf('성명');return t.rows.filter(r=>r[name]===p.person).map(r=>({headers:t.headers,row:r}));}),scope=`조회 조건: ${task._dailyConditions.school} / ${p.date}\n일일근무상황 ${task._dutyPages.size}페이지, 총 ${count}건 대조.`;
+   if(!matching.length)return done(scope+`\n공개된 이 목록에서 ${p.person}의 복무 항목은 확인되지 않았습니다. 대상자의 재직·동명이인 여부나 비공개·미표시 복무까지 확인한 결과는 아니므로 복무가 없다고 단정하지 않습니다.`);
+   const identities=new Set(matching.map(({headers,row})=>row[headers.findIndex(h=>/직급|직위|직종/.test(h))]));if(identities.size>1)return done(scope+'\n대상 이름에 여러 직급·직위가 표시되어 동명이인 여부를 확인해야 합니다.');
+   return done(scope+'\n'+matching.map(({headers,row})=>headers.join(' | ')+'\n'+row.join(' | ')).join('\n')+'\n현재 계정 권한으로 공개된 조회 결과이며 비공개·미표시 복무는 포함하지 않습니다.');
+  }
   if(personField.length&&dates.length){
    const change=set([[/^(?:성명|이름|대상자|직원명|교직원명)$/,p.person],[/^(?:조회일자|조회일|기준일자|기준일|기간시작일자|시작일자)$/,p.date],[/^(?:기간종료일자|종료일자)$/,p.date],...(p.organization?[[/^(?:소속|기관|부서)$/,p.organization]]:[])]);if(change)return change;
    const lastFill=rows.findLastIndex(r=>r.name==='gyomu_browser'&&['fill','select'].includes(r.args.action)&&!r.value.error),lastQuery=rows.findLastIndex((r,i)=>r.name==='gyomu_browser'&&r.args.action==='click'&&!r.value.error&&rows.slice(0,i).findLast(x=>x.value.elements)?.value.elements?.some(e=>e.ref===r.args.ref&&/^(조회|검색)$/.test(fields(e)))),queried=lastQuery>lastFill;
