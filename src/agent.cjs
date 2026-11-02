@@ -34,6 +34,7 @@ async function runAgent({prompt,context,settings,request,execute,send,signal,his
  let final='',failureCount=0,staticStatus=null;const toolFailures=new Map();
  if(task?.observe){const id='current-screen',args={action:'snapshot'};send({type:'tool',name:'gyomu_browser',args});let output;try{output=await execute('gyomu_browser',args,signal);}catch(error){output={error:error.message};}input.push({type:'function_call',name:'gyomu_browser',arguments:JSON.stringify(args),call_id:id},{type:'function_call_output',call_id:id,output:JSON.stringify(output)});send({type:'toolDone',name:'gyomu_browser'});}
  for(let turn=0;turn<(task?.area==='draft-cycle'?200:task?.allCirculation||task?.archive?2000:task?48:24);turn++){
+  const prior=input.at(-1),priorCall=prior?.type==='function_call_output'&&input.find(i=>i.type==='function_call'&&i.call_id===prior.call_id);let pendingRead=false;if(priorCall?.name==='gyomu_wxs_read')try{pendingRead=JSON.parse(prior.output).pending===true;}catch{}if(pendingRead)await require('node:timers/promises').setTimeout(1000,undefined,{signal});
   if(signal.aborted)throw new Error('작업을 중지했습니다. 완료된 변경은 유지됩니다.');send({type:'status',text:turn?'결과를 확인하고 있습니다…':'AI에 요청하고 있습니다…'});
   let step=taskStep(task,input,availableTools);
   if(!step.context?.nativeDialog&&!step.receipt)step=wxsStep(prompt,input,step,task);
