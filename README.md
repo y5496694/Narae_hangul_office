@@ -65,3 +65,6 @@ npm run test:talk:desktop
 ```
 
 CLI는 문서 작업 `narae-office`, 에이전트 `narae-talk`으로 분리됩니다. 설치기는 두 앱의 별도 바로가기와 아이콘을 만듭니다. 원본 도구의 상세 절차와 모델 학습·라이선스·실환경 검증 범위는 `docs`와 `experiments`의 근거를 따릅니다.
+
+
+나래톡의 개인 메모·달력·여러 CLI 친구 톡방·GitHub 업데이트와 지역 메신저 설치 기능은 [나래톡 저장소](https://github.com/y5496694/Narae_talk)에 있습니다. 이 저장소의 오피스 화면은 한글 문서와 문서용 AI 기능만 제공합니다.
