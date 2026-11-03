@@ -36,3 +36,7 @@ llama.cpp CPU runtime b11960: https://github.com/ggml-org/llama.cpp · MIT. 공�
 나래4는 Qwen3.5-2B 본체와 Office LoRA(Apache-2.0), 별도로 호출되는 LiquidAI/d1-2B 판단기(LFM Open License v1.0)를 사용합니다. 두 모델의 가중치를 합친 sparse MoE는 아닙니다. 각 원문은 resources/model-licenses/Narae4-LICENSE.txt에 유지합니다.
 
 `vendor/kakao-cli` and `vendor/narae-messenger-cli` preserve the MIT-licensed upstream sources and LICENSE files. `vendor/MESSENGER_LOCK.json` pins their commits and SHA256 hashes. The messenger applications, personal messages, captured screens and credential stores are not distributed. Native inspection can use a separately installed REA/Frida runtime; that runtime is not included in these source snapshots.
+
+## 나래톡 서비스 아이콘
+
+`ui/assets/cbe.png`와 `ui/assets/kakao.png`는 각각 이 PC에 설치된 충북소통메신저(CBE Talk)와 카카오톡 실행 파일에서 추출한 원본 서비스 식별 아이콘입니다. 각 서비스의 권리는 해당 권리자에게 있으며 제휴나 서비스 제공 주체를 뜻하지 않습니다. 설치된 CLI 친구 식별에 사용합니다.
